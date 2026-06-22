@@ -25,6 +25,10 @@ log = logging.getLogger (__name__)
 # instance config; see vmrcre/README.md.
 DEFAULT_NTVMR_API_URL = 'https://ntvmr.uni-muenster.de/community/vmr/api/'
 
+# Identify ourselves.  The NTVMR's fail2ban bans the default 'python-requests'
+# User-Agent, so we must send a real one or the app server gets jailed.
+USER_AGENT = 'intf-cbgm/1.0 (NTVMR integration)'
+
 
 def init_app (app):
     """ Initialize the flask app. """
@@ -170,7 +174,8 @@ def ntvmr_service_request (service, data, session_hash = None):
         data = dict (data, sessionHash = session_hash)
     url = ntvmr_api_url () + service.strip ('/') + '/'
     try:
-        r = requests.post (url, data = data, timeout = 10)
+        r = requests.post (url, data = data, timeout = 10,
+                           headers = {'User-Agent': USER_AGENT})
         return minidom.parseString (r.text.encode ('utf-8')).documentElement
     except Exception as e:  # pylint: disable=broad-except
         log.warning ('NTVMR service request to %s failed: %s', url, e)

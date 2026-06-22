@@ -41,6 +41,10 @@ log = logging.getLogger('ntvmrimport')
 
 DEFAULT_API_URL = 'https://ntvmr.uni-muenster.de/community/vmr/api/'
 
+# The NTVMR's fail2ban bans the default 'python-requests' User-Agent, so we
+# must identify ourselves with a real one.
+USER_AGENT = 'intf-cbgm ntvmrimport/1.0'
+
 # NTVMR verse hash encodes the book as (2000 + CBGM book id) for the NT, e.g.
 # 1Tim.1.1 -> 2015001001 -> CBGM book 15.
 NTVMR_BOOK_OFFSET = 2000
@@ -66,7 +70,8 @@ def api_get(api_url, path, params, retries=4):
     last_err = None
     for attempt in range(retries):
         try:
-            r = requests.get(url, params=params, timeout=120)
+            r = requests.get(url, params=params, timeout=120,
+                             headers={'User-Agent': USER_AGENT})
             r.raise_for_status()
             return ET.fromstring(r.text)
         except Exception as e:  # pylint: disable=broad-except
