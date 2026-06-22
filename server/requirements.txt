@@ -1,5 +1,10 @@
 Babel==2.9.1
 Flask==2.0.1
+# Flask 2.0.1 needs its contemporaneous sub-deps; newer ones dropped symbols
+# (e.g. werkzeug.urls.url_quote) and break the import.  Pin to the 2021 set.
+Werkzeug==2.0.3
+itsdangerous==2.0.1
+MarkupSafe==2.0.1
 Flask-Babel==2.0.0
 Flask-SQLAlchemy==2.5.1
 Flask-User==0.6.21

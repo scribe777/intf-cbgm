@@ -1,0 +1,21 @@
+# Dev compose: runs the LOCALLY BUILT images (intf/ntg-*) instead of the
+# published scdh/* images, so it exercises this branch's code (NTVMR auth, etc.).
+#   podman-compose -f docker-compose.dev.yml up -d
+version: "3"
+services:
+  ntg-db-server:
+    image: intf/ntg-db-server
+    volumes:
+      - pgdata:/var/lib/postgresql
+    environment:
+      POSTGRES_PASSWORD: topsecret
+
+  ntg-app-server:
+    image: intf/ntg-app-server
+    ports:
+      - "5000:5000"
+    depends_on:
+      - ntg-db-server
+
+volumes:
+  pgdata:
