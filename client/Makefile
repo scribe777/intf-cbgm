@@ -5,7 +5,7 @@ STYLELINT := node_modules/.bin/stylelint --custom-formatter ./stylelint-unix-for
 
 .PHONY: build build-production
 
-AUX := build/index.html build/api.conf.js build/pdfs/Short_Guide_CBGM_Mark_KW.pdf
+AUX := build/index.html build/api.conf.js build-pdfs build-images
 
 build: $(AUX)
 	$(WEBPACK) --config webpack.dev.js
@@ -42,3 +42,13 @@ build/api.conf.js: src/api.conf.js
 build/pdfs/Short_Guide_CBGM_Mark_KW.pdf: src/pdfs/Short_Guide_CBGM_Mark_KW.pdf
 	-mkdir -p build/pdfs
 	cp $< $@
+
+build-pdfs:
+	rm -rf build/pdfs
+	mkdir build/pdfs
+	cp -r src/pdfs build
+
+build-images:
+	rm -rf build/images
+	mkdir build/images
+	cp -r src/images build

@@ -63,6 +63,8 @@ class Config ():
     CONFIG_FILE = '_global.conf'  # default = ./instance/_global.conf
     STATIC_FOLDER = 'static'
     STATIC_URL_PATH = 'static'
+    # STATIC_FOLDER = '../client/build' # for local development
+    # STATIC_URL_PATH = '../client/build' # for local development
     AFTER_LOGIN_URL = None
     USE_RELOADER = False
     USE_DEBUGGER = False

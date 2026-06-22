@@ -14,7 +14,7 @@ SHELL       := /bin/bash
 PYTHON      := /usr/bin/python3
 MYSQL       := mysql --defaults-file=~/.my.cnf.ntg
 BROWSER     := firefox
-JSDOC       := jsdoc -c doc_src/jsdoc.conf.js
+JSDOC       := npx jsdoc -c doc_src/jsdoc.conf.js
 RSYNCPY     := $(RSYNC) --exclude "**/__pycache__"  --exclude "*.pyc"
 
 PSQL_PORT   := 5432

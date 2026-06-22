@@ -1,41 +1,45 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
   <title>NTG Documentation &mdash; NTG 0.1.1 documentation</title>
   
 
   
-  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/my_theme.css" type="text/css" />
+
   
   
 
   
-  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
-  <link rel="stylesheet" href="_static/my_theme.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Introduction" href="intro.html" /> 
@@ -72,6 +76,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -81,11 +86,10 @@
             
               <ul>
 <li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#web-application">Web Application</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#preparing-the-database-for-the-cbgm">Preparing the Database for the CBGM</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#applying-the-cbgm">Applying the CBGM</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#updating-the-apparatus">Updating the Apparatus</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#links">Links</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#basic-terms-and-procedures-of-the-coherence-based-genealogical-method-cbgm">Basic Terms and Procedures of the Coherence-Based Genealogical Method (CBGM)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="intro.html#links">Links</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a><ul>
@@ -102,6 +106,7 @@
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#install">Install</a></li>
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#running-the-web-application">Running the web application</a></li>
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#running-the-cbgm">Running the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="install-docker.html#troubleshooting">Troubleshooting</a></li>
 </ul>
 </li>
 </ul>
@@ -124,54 +129,8 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="developer.html">Developer Manual</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="domain.html">Introduction to the Problem Domain (German)</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#das-neue-testament">Das Neue Testament</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#editionen">Editionen</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#die-textzeugen">Die Textzeugen</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#textformen-texttypen">Textformen (Texttypen)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#textkritik">Textkritik</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#terminologie">Terminologie</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#literatur">Literatur</a></li>
-</ul>
-</li>
 <li class="toctree-l2"><a class="reference internal" href="client_dev.html">Web Client</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-app">client/app</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-apparatus">client/apparatus</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-coherence">client/coherence</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison">client/comparison</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison-details-table">client/comparison_details_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison-table">client/comparison_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-chord-layout">client/d3_chord_layout</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-common">client/d3_common</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-stemma-layout">client/d3_stemma_layout</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-find-relatives">client/find_relatives</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-flash-messages">client/flash_messages</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-leitzeile">client/leitzeile</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-local-stemma">client/local_stemma</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-notes">client/notes</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-notes-list">client/notes_list</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-optimal-substemma">client/optimal_substemma</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-optimal-substemma-details">client/optimal_substemma_details</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-page-header">client/page_header</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-project-list">client/project_list</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-relatives-metrics">client/relatives_metrics</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-relatives-table">client/relatives_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-set-cover">client/set_cover</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-table-sort-mixin">client/table_sort_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-table-toggle-mixin">client/table_toggle_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-textflow">client/textflow</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-tools">client/tools</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-autocomplete">client/widgets/autocomplete</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-button-group">client/widgets/button_group</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-card">client/widgets/card</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-card-caption">client/widgets/card_caption</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-connectivity">client/widgets/connectivity</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-context-menu">client/widgets/context_menu</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-dropdown-mixin">client/widgets/dropdown_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-labezator">client/widgets/labezator</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-navigator">client/widgets/navigator</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-range">client/widgets/range</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-toolbar">client/widgets/toolbar</a></li>
+<li class="toctree-l3"><a class="reference internal" href="client_dev.html#module-client-app">Modules</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="server_dev.html">API Server</a><ul>
@@ -185,6 +144,12 @@
 <li class="toctree-l3"><a class="reference internal" href="server_dev.html#module-server.helpers">server.helpers</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="server_config.html">API Server Configuration Files</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#per-application-configuration-files">Per-Application Configuration Files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#global-configuration-file">Global Configuration File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#footnotes">Footnotes</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="scripts_dev.html">Scripts</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="scripts_dev.html#module-scripts.cceh.import">scripts.cceh.import</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scripts_dev.html#module-scripts.cceh.prepare">scripts.cceh.prepare</a></li>
@@ -196,13 +161,49 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="database.html">Database Structure</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="database.html#cbgm-database">CBGM Database</a></li>
-<li class="toctree-l3"><a class="reference internal" href="database.html#source-database">Source Database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#source-databases">Source Databases</a></li>
 <li class="toctree-l3"><a class="reference internal" href="database.html#literature">Literature</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="ntg_common.html">Various Functions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="database_faq.html">Database FAQ</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="database_faq.html#manual-editing-of-journalled-tables">Manual Editing of Journalled Tables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database_faq.html#apparatus-updates">Apparatus Updates</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ntg_common.html">Common Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.cbgm_common">ntg_common.cbgm_common</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.config">ntg_common.config</a></li>
 <li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.db_tools">ntg_common.db_tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.exceptions">ntg_common.exceptions</a></li>
 <li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.tools">ntg_common.tools</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="vm.html">ntg.uni-muenster.de</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#apache">Apache</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#api-server">API Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#postgres">Postgres</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#users">Users</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#backups">Backups</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#icinga">Icinga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#openstack-cloud">OpenStack Cloud</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cbgm.html">CBGM</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#preparing-the-database-for-the-cbgm">Preparing the Database for the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#applying-the-cbgm">Applying the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-project">Starting a New Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-phase">Starting a New Phase</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-phase-with-apparatus-update">Starting a New Phase With Apparatus Update</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="user_management.html">User Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="user_management.html#manual-user-management">Manual User Management</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="technologies.html">Technologies Used</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#server">Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#client">Client</a></li>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#scripts">Scripts</a></li>
 </ul>
 </li>
 </ul>
@@ -212,6 +213,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -246,18 +248,20 @@
 
 
 
+
+
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="#">Docs</a> &raquo;</li>
+      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
         
       <li>NTG Documentation</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
-            
+          
             <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
           
         
@@ -276,11 +280,7 @@
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#web-application">Web Application</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#preparing-the-database-for-the-cbgm">Preparing the Database for the CBGM</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#applying-the-cbgm">Applying the CBGM</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#updating-the-apparatus">Updating the Apparatus</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#links">Links</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#basic-terms-and-procedures-of-the-coherence-based-genealogical-method-cbgm">Basic Terms and Procedures of the Coherence-Based Genealogical Method (CBGM)</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a><ul>
@@ -295,12 +295,17 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="developer.html">Developer Manual</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="domain.html">Introduction to the Problem Domain (German)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="client_dev.html">Web Client</a></li>
 <li class="toctree-l2"><a class="reference internal" href="server_dev.html">API Server</a></li>
+<li class="toctree-l2"><a class="reference internal" href="server_config.html">API Server Configuration Files</a></li>
 <li class="toctree-l2"><a class="reference internal" href="scripts_dev.html">Scripts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="database.html">Database Structure</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ntg_common.html">Various Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="database_faq.html">Database FAQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ntg_common.html">Common Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vm.html">ntg.uni-muenster.de</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cbgm.html">CBGM</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_management.html">User Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="technologies.html">Technologies Used</a></li>
 </ul>
 </li>
 </ul>
@@ -320,27 +325,28 @@
            
           </div>
           <footer>
-  
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="intro.html" class="btn btn-neutral float-right" title="Introduction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
+        <a href="intro.html" class="btn btn-neutral float-right" title="Introduction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2016-19 CCeH - Licensed under the GNU GPL v3 or later
+        &#169; Copyright 2016-20 CCeH - Licensed under the GNU GPL v3 or later.
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
-
         </div>
       </div>
 
@@ -348,7 +354,6 @@
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

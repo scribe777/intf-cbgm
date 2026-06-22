@@ -44,6 +44,8 @@ BOOKS = [
 
     (27, "Ap",   "Revelation",     22),
 
+    (50, "Yasna", "Yasna",          6), # Zoroaster project
+
     (210, "2Sam", "2 Samuel",       2), # Hack for Septuaginta Test
 ]
 """ Titles of the NT books """
@@ -53,7 +55,9 @@ BYZ_HSNR = {
     "CL"       : "(300010, 300180, 300350, 303300, 303980, 304240, 312410)",
     "John"     : "(200070, 200280, 200450, 300180, 300350, 302260, 313200)",
     "Mark"     : "(300030, 300180, 300350, 301050, 302610, 303510, 326070)",
+    "Matt"     : "(300180, 300350, 301500, 302300, 305090, 311100, 311900)",
     "2 Samuel" : None,
+    "Yasna"    : None,
 }
 """Manuscripts attesting the Byzantine Text.
 
@@ -66,6 +70,10 @@ to our rules.
 
 FEHLVERSE = """
     (
+      begadr >= 11721002 and endadr <= 11721024 or
+      begadr >= 11811002 and endadr <= 11811018 or
+      begadr >= 12314002 and endadr <= 12314050 or
+
       begadr >= 20716000 and endadr <= 20716999 or
       begadr >= 20944000 and endadr <= 20944999 or
       begadr >= 20946000 and endadr <= 20946999 or

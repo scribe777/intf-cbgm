@@ -1,3 +1,4 @@
+# General
 *~
 \#*\#
 *.bak
@@ -5,7 +6,6 @@ backups/
 node_modules/
 jsdoc/
 output/
-*pg_dump*
 instance/*.conf
 server/templates/schemas.xml
 pip-freeze.txt
@@ -17,14 +17,11 @@ sphinxjs
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
 
 # Distribution / packaging
 .Python
 env/
-# build/
 develop-eggs/
 dist/
 downloads/
@@ -41,10 +38,6 @@ var/
 *.egg
 package-lock.json
 *.eot
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
@@ -62,12 +55,6 @@ nosetests.xml
 coverage.xml
 *,cover
 .hypothesis/
-
-# Translations
-#*.mo
-#*.pot
-
-# Django stuff:
 *.log
 
 # Sphinx documentation
@@ -77,10 +64,6 @@ docs/.buildinfo
 *.log
 *.out
 sphinxcontrib/
-
-#Ignore docs temporarily
-docs/
-docs_org/
 
 # PyBuilder
 target/
@@ -93,7 +76,3 @@ docker/server
 docker/ntg_common
 docker/client
 docker/scripts
-docker/backup
-
-#Python VirtualEnv
-venv

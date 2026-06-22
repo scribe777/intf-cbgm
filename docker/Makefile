@@ -19,10 +19,10 @@ build: Makefile
 	docker build -f Dockerfile    --tag=intf/ntg-app-server .
 
 # this command only works on a production server with a fully functional database
-backup:
-	mkdir -p /tmp/backup
-	pg_dump --format custom mark_ph31 -n ntg -T "ntg.original_*" -T "ntg.tmp_*" \
-			--exclude-table-data="ntg.notes*" > /tmp/backup/mark_ph31.dump
+# backup:
+# 	mkdir -p /tmp/backup
+# 	pg_dump --format custom mark_ph31 -n ntg -T "ntg.original_*" -T "ntg.tmp_*" \
+# 			--exclude-table-data="ntg.notes*" > /tmp/backup/mark_ph31.dump
 
 run: build
 	docker-compose up

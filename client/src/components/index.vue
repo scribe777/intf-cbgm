@@ -2,31 +2,35 @@
   <div class="vm-index">
     <div class="container bs-docs-container">
       <div v-if="$store.getters.can_read">
-        <router-link
+      <ul>
+        <li><router-link
           class="biglink"
           :to="{ name: 'coherence', params: { passage_or_id: 1 } }"
           >Coherence and Textual Flow</router-link
         >
-        <router-link class="biglink" :to="{ name: 'comparison' }"
+        </li><li><router-link class="biglink" :to="{ name: 'comparison' }"
           >Comparison of Witnesses</router-link
         >
-        <router-link class="biglink" :to="{ name: 'find_relatives' }"
+        </li><li><router-link class="biglink" :to="{ name: 'find_relatives' }"
           >Find Relatives</router-link
         >
+        </li></ul>
         <div v-if="$store.getters.can_read_private">
-          <router-link class="biglink" :to="{ name: 'notes_list' }"
+        <ul>
+          </li><li><router-link class="biglink" :to="{ name: 'notes_list' }"
             >List of Notes</router-link
           >
-          <router-link class="biglink" :to="{ name: 'checks_list' }"
+          </li><li><router-link class="biglink" :to="{ name: 'checks_list' }"
             >List of Congruence Check Failures</router-link
           >
-          <router-link class="biglink" :to="{ name: 'opt_stemma' }"
+          </li><li><router-link class="biglink" :to="{ name: 'opt_stemma' }"
             >Optimal Substemma</router-link
           >
-          <router-link class="biglink" :to="{ name: 'set_cover' }"
+          </li><li><router-link class="biglink" :to="{ name: 'set_cover' }"
             >Minimum Set Cover</router-link
-          >
+          ></li></ul>
         </div>
+        
       </div>
     </div>
   </div>
@@ -36,10 +40,17 @@
 /* index.vue */
 
 div.vm-index {
+  ul li {
+    &:hover {
+      font-weight: bold;
+    }
+    list-style: disclosure-closed;
+}
   a.biglink {
     display: block;
     font-size: 150%;
     margin: 1em 0;
+    text-decoration: none
   }
 
   div.gdpr {

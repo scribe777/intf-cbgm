@@ -37,7 +37,7 @@ Install
 
 2. Create a new directory and change into it.
 
-3. Download https://raw.githubusercontent.com/cceh/ntg/master/docker/docker-compose.yml
+3. Download https://raw.githubusercontent.com/SCDH/intf-cbgm/master/docker/docker-compose.yml
 
 4. Run:
 

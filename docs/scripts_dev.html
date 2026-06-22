@@ -1,45 +1,50 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
   <title>Scripts &mdash; NTG 0.1.1 documentation</title>
   
 
   
-  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/my_theme.css" type="text/css" />
+
   
   
 
   
-  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
-  <link rel="stylesheet" href="_static/my_theme.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Database Structure" href="database.html" />
-    <link rel="prev" title="API Server" href="server_dev.html" /> 
+    <link rel="prev" title="API Server Configuration Files" href="server_config.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -73,6 +78,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -82,11 +88,10 @@
             
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#web-application">Web Application</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#preparing-the-database-for-the-cbgm">Preparing the Database for the CBGM</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#applying-the-cbgm">Applying the CBGM</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#updating-the-apparatus">Updating the Apparatus</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#links">Links</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#basic-terms-and-procedures-of-the-coherence-based-genealogical-method-cbgm">Basic Terms and Procedures of the Coherence-Based Genealogical Method (CBGM)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="intro.html#links">Links</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a><ul>
@@ -103,6 +108,7 @@
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#install">Install</a></li>
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#running-the-web-application">Running the web application</a></li>
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#running-the-cbgm">Running the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="install-docker.html#troubleshooting">Troubleshooting</a></li>
 </ul>
 </li>
 </ul>
@@ -125,54 +131,8 @@
 </ul>
 </li>
 <li class="toctree-l1 current"><a class="reference internal" href="developer.html">Developer Manual</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="domain.html">Introduction to the Problem Domain (German)</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#das-neue-testament">Das Neue Testament</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#editionen">Editionen</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#die-textzeugen">Die Textzeugen</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#textformen-texttypen">Textformen (Texttypen)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#textkritik">Textkritik</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#terminologie">Terminologie</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#literatur">Literatur</a></li>
-</ul>
-</li>
 <li class="toctree-l2"><a class="reference internal" href="client_dev.html">Web Client</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-app">client/app</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-apparatus">client/apparatus</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-coherence">client/coherence</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison">client/comparison</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison-details-table">client/comparison_details_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison-table">client/comparison_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-chord-layout">client/d3_chord_layout</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-common">client/d3_common</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-stemma-layout">client/d3_stemma_layout</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-find-relatives">client/find_relatives</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-flash-messages">client/flash_messages</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-leitzeile">client/leitzeile</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-local-stemma">client/local_stemma</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-notes">client/notes</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-notes-list">client/notes_list</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-optimal-substemma">client/optimal_substemma</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-optimal-substemma-details">client/optimal_substemma_details</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-page-header">client/page_header</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-project-list">client/project_list</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-relatives-metrics">client/relatives_metrics</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-relatives-table">client/relatives_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-set-cover">client/set_cover</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-table-sort-mixin">client/table_sort_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-table-toggle-mixin">client/table_toggle_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-textflow">client/textflow</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-tools">client/tools</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-autocomplete">client/widgets/autocomplete</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-button-group">client/widgets/button_group</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-card">client/widgets/card</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-card-caption">client/widgets/card_caption</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-connectivity">client/widgets/connectivity</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-context-menu">client/widgets/context_menu</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-dropdown-mixin">client/widgets/dropdown_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-labezator">client/widgets/labezator</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-navigator">client/widgets/navigator</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-range">client/widgets/range</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-toolbar">client/widgets/toolbar</a></li>
+<li class="toctree-l3"><a class="reference internal" href="client_dev.html#module-client-app">Modules</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="server_dev.html">API Server</a><ul>
@@ -186,6 +146,12 @@
 <li class="toctree-l3"><a class="reference internal" href="server_dev.html#module-server.helpers">server.helpers</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="server_config.html">API Server Configuration Files</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#per-application-configuration-files">Per-Application Configuration Files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#global-configuration-file">Global Configuration File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#footnotes">Footnotes</a></li>
+</ul>
+</li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Scripts</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#module-scripts.cceh.import">scripts.cceh.import</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#module-scripts.cceh.prepare">scripts.cceh.prepare</a></li>
@@ -197,13 +163,49 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="database.html">Database Structure</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="database.html#cbgm-database">CBGM Database</a></li>
-<li class="toctree-l3"><a class="reference internal" href="database.html#source-database">Source Database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#source-databases">Source Databases</a></li>
 <li class="toctree-l3"><a class="reference internal" href="database.html#literature">Literature</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="ntg_common.html">Various Functions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="database_faq.html">Database FAQ</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="database_faq.html#manual-editing-of-journalled-tables">Manual Editing of Journalled Tables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database_faq.html#apparatus-updates">Apparatus Updates</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ntg_common.html">Common Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.cbgm_common">ntg_common.cbgm_common</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.config">ntg_common.config</a></li>
 <li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.db_tools">ntg_common.db_tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.exceptions">ntg_common.exceptions</a></li>
 <li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.tools">ntg_common.tools</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="vm.html">ntg.uni-muenster.de</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#apache">Apache</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#api-server">API Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#postgres">Postgres</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#users">Users</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#backups">Backups</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#icinga">Icinga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#openstack-cloud">OpenStack Cloud</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cbgm.html">CBGM</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#preparing-the-database-for-the-cbgm">Preparing the Database for the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#applying-the-cbgm">Applying the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-project">Starting a New Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-phase">Starting a New Phase</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-phase-with-apparatus-update">Starting a New Phase With Apparatus Update</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="user_management.html">User Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="user_management.html#manual-user-management">Manual User Management</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="technologies.html">Technologies Used</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#server">Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#client">Client</a></li>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#scripts">Scripts</a></li>
 </ul>
 </li>
 </ul>
@@ -213,6 +215,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -247,11 +250,13 @@
 
 
 
+
+
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="index.html">Docs</a> &raquo;</li>
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
         
           <li><a href="developer.html">Developer Manual</a> &raquo;</li>
         
@@ -260,7 +265,7 @@
     
       <li class="wy-breadcrumbs-aside">
         
-            
+          
             <a href="_sources/scripts_dev.rst.txt" rel="nofollow"> View page source</a>
           
         
@@ -276,8 +281,18 @@
             
   <span class="target" id="module-scripts"></span><div class="section" id="scripts">
 <h1>Scripts<a class="headerlink" href="#scripts" title="Permalink to this headline">¶</a></h1>
+<div class="contents local topic" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#module-scripts.cceh.import" id="id1">scripts.cceh.import</a></p></li>
+<li><p><a class="reference internal" href="#module-scripts.cceh.prepare" id="id2">scripts.cceh.prepare</a></p></li>
+<li><p><a class="reference internal" href="#module-scripts.cceh.cbgm" id="id3">scripts.cceh.cbgm</a></p></li>
+<li><p><a class="reference internal" href="#module-scripts.cceh.save_edits" id="id4">scripts.cceh.save_edits</a></p></li>
+<li><p><a class="reference internal" href="#module-scripts.cceh.load_edits" id="id5">scripts.cceh.load_edits</a></p></li>
+<li><p><a class="reference internal" href="#module-scripts.cceh.mk_users" id="id6">scripts.cceh.mk_users</a></p></li>
+</ul>
+</div>
 <div class="section" id="module-scripts.cceh.import">
-<span id="scripts-cceh-import"></span><h2>scripts.cceh.import<a class="headerlink" href="#module-scripts.cceh.import" title="Permalink to this headline">¶</a></h2>
+<span id="scripts-cceh-import"></span><h2><a class="toc-backref" href="#id1">scripts.cceh.import</a><a class="headerlink" href="#module-scripts.cceh.import" title="Permalink to this headline">¶</a></h2>
 <p>Import databases from mysql.</p>
 <p>This script initializes the postgres database and then imports data from one or
 more mysql databases.</p>
@@ -288,50 +303,53 @@ more mysql databases.</p>
 <p>The source databases are:</p>
 <ol class="arabic simple">
 <li><p>a database containing the apparatus of the <em>Editio Critica Maior</em>
-publication (ECM).</p></li>
-<li><p>a database containing the editorial decisions regarding the priority of the
-readings (VarGen).</p></li>
-<li><p>a database containing the “Leitzeile” (Nestle).</p></li>
+publication (ECM),</p></li>
+<li><p>a database containing the <em>Leitzeile</em>, and</p></li>
+<li><p>optionally a database containing the editorial decisions regarding the
+priority of the readings (VarGen).</p></li>
 </ol>
 <p>The source tables for Acts are partitioned into 28 chapters.  This is a
 historical incident: The software used when the CBGM was first implemented could
-not handle big tables.  The import script is able to join partitioned tables.</p>
-<p>After running this script should run the <a class="reference internal" href="scripts_user.html#prepare-py"><span class="std std-ref">scripts/cceh/prepare.py</span></a> script.</p>
-<dl class="function">
-<dt id="scripts.cceh.import.concat_tables_fdw">
-<code class="sig-name descname">concat_tables_fdw</code><span class="sig-paren">(</span><em class="sig-param">conn</em>, <em class="sig-param">meta</em>, <em class="sig-param">dest_table</em>, <em class="sig-param">fdw</em>, <em class="sig-param">table_mask</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.import.concat_tables_fdw" title="Permalink to this definition">¶</a></dt>
+not handle big tables.  The import script joins partitioned tables into one.</p>
+<p>After running this script you should run the <a class="reference internal" href="scripts_user.html#prepare-py"><span class="std std-ref">scripts/cceh/prepare.py</span></a> script.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.import.concat_tables_fdw">
+<span class="sig-name descname"><span class="pre">concat_tables_fdw</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dest_table</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fdw</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table_mask</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.import.concat_tables_fdw" title="Permalink to this definition">¶</a></dt>
 <dd><p>Concatenate multiple tables into one.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.import.copy_table_fdw">
-<code class="sig-name descname">copy_table_fdw</code><span class="sig-paren">(</span><em class="sig-param">conn</em>, <em class="sig-param">dest_table</em>, <em class="sig-param">fdw</em>, <em class="sig-param">source_table</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.import.copy_table_fdw" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.import.copy_table_fdw">
+<span class="sig-name descname"><span class="pre">copy_table_fdw</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dest_table</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fdw</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_table</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.import.copy_table_fdw" title="Permalink to this definition">¶</a></dt>
 <dd><p>Copy a table.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.import.import_att_fdw">
-<code class="sig-name descname">import_att_fdw</code><span class="sig-paren">(</span><em class="sig-param">dbsrc</em>, <em class="sig-param">dbdest</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.import.import_att_fdw" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.import.import_att_fdw">
+<span class="sig-name descname"><span class="pre">import_att_fdw</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dbsrc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dbdest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.import.import_att_fdw" title="Permalink to this definition">¶</a></dt>
 <dd><p>Import att and lac tables from mysql.</p>
 <p>Import the (28 * 2) mysql tables to 2 tables in the postgres database.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.import.import_genealogical_fdw">
-<code class="sig-name descname">import_genealogical_fdw</code><span class="sig-paren">(</span><em class="sig-param">dbsrc</em>, <em class="sig-param">dbdest</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.import.import_genealogical_fdw" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.import.import_genealogical_fdw">
+<span class="sig-name descname"><span class="pre">import_genealogical_fdw</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dbsrc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dbdest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.import.import_genealogical_fdw" title="Permalink to this definition">¶</a></dt>
 <dd><p>Import genealogical tables from mysql.</p>
 <p>Import the (28 * 3) mysql tables to 3 tables in the postgres database.</p>
+<p>This function is relevant only for Acts, where we had to import genealogical
+data from a previous implementation of the CBGM.  It is not used for new
+projects.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.import.import_nestle_fdw">
-<code class="sig-name descname">import_nestle_fdw</code><span class="sig-paren">(</span><em class="sig-param">dbsrc</em>, <em class="sig-param">dbdest</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.import.import_nestle_fdw" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.import.import_nestle_fdw">
+<span class="sig-name descname"><span class="pre">import_nestle_fdw</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dbsrc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dbdest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.import.import_nestle_fdw" title="Permalink to this definition">¶</a></dt>
 <dd><p>Import Nestle table from mysql.</p>
 </dd></dl>
 
 </div>
 <div class="section" id="module-scripts.cceh.prepare">
-<span id="scripts-cceh-prepare"></span><h2>scripts.cceh.prepare<a class="headerlink" href="#module-scripts.cceh.prepare" title="Permalink to this headline">¶</a></h2>
+<span id="scripts-cceh-prepare"></span><h2><a class="toc-backref" href="#id2">scripts.cceh.prepare</a><a class="headerlink" href="#module-scripts.cceh.prepare" title="Permalink to this headline">¶</a></h2>
 <p>Initialize a CBGM database.</p>
 <p>This script converts the databases structure used in the production of the <em>ECM</em>
 into a database structure suitable for doing CBGM. It</p>
@@ -339,7 +357,7 @@ into a database structure suitable for doing CBGM. It</p>
 <li><p>normalizes the databases,</p></li>
 <li><p>removes manuscripts, passages and readings irrelevant to the CBGM,</p></li>
 <li><p>builds a positive apparatus from the negative apparatus,</p></li>
-<li><p>reconstructs the <a class="reference internal" href="domain.html#mt"><span class="std std-ref">Majority Text</span></a>.</p></li>
+<li><p>reconstructs the <code class="xref any docutils literal notranslate"><span class="pre">mt</span></code>.</p></li>
 </ul>
 <p>Database normalization is the usual process of restructuring your tables so they
 don’t contain redundant data.</p>
@@ -351,7 +369,7 @@ differing only by orthgographic convention.</p>
 <p>The script then <a class="reference internal" href="#transform-positive"><span class="std std-ref">transforms</span></a> the negative apparatus into a
 positive apparatus, that is, an apparatus that is defined for all manuscripts at
 all passages.</p>
-<p>Finally the script reconstructs the <a class="reference internal" href="domain.html#mt"><span class="std std-ref">Majority Text</span></a>.</p>
+<p>Finally the script reconstructs the <code class="xref any docutils literal notranslate"><span class="pre">mt</span></code>.</p>
 <p>After running this script you should run the <a class="reference internal" href="scripts_user.html#cbgm-py"><span class="std std-ref">scripts/cceh/cbgm.py</span></a> script.</p>
 <blockquote>
 <div><p>Ausgangspunkt ist der Apparat mit allen für die Druckfassung notwendigen
@@ -369,11 +387,11 @@ z.B. die Seite beschädigt ist.  Korrekturen oder Alternativlesarten werden
 für die CBGM ignoriert.</p>
 <p class="attribution">—ArbeitsablaufCBGMApg_Db.docx</p>
 </div></blockquote>
-<dl class="function">
-<dt id="scripts.cceh.prepare.build_MT_text">
-<code class="sig-name descname">build_MT_text</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.build_MT_text" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.build_MT_text">
+<span class="sig-name descname"><span class="pre">build_MT_text</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.build_MT_text" title="Permalink to this definition">¶</a></dt>
 <dd><p>Reconstruct the Majority Text</p>
-<p>Build a virtual manuscript that reconstructs the <a class="reference internal" href="domain.html#mt"><span class="std std-ref">Majority Text</span></a>.</p>
+<p>Build a virtual manuscript that reconstructs the <code class="xref any docutils literal notranslate"><span class="pre">mt</span></code>.</p>
 <blockquote>
 <div><p id="mt-rules">Im Laufe der Textgeschichte hat sich eine Textform durchgesetzt, der
 sogenannte Mehrheitstext, der auch Byzantinischer Text genannt wird.
@@ -392,68 +410,43 @@ Lesarten abweichen.</p></li>
 </div></blockquote>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.copy_genealogical">
-<code class="sig-name descname">copy_genealogical</code><span class="sig-paren">(</span><em class="sig-param">dbdest</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.copy_genealogical" title="Permalink to this definition">¶</a></dt>
-<dd><p>Copy / fix genealogical data</p>
-<blockquote>
-<div><p>kopiert die Daten aus ECM_Acts_CBGM nach VarGenAtt_Act, zur weiteren
-Bearbeitung im Stemma-Editor</p>
-<p class="attribution">—VGA/Att2CBGMPh3.pl</p>
-</div></blockquote>
-<blockquote>
-<div><p>Kopiert die genealogischen Informationen von einer Phase zur nächsten.</p>
-<p>Splitts müssen nur dort übertragen werden, wo sich der Apparat nicht
-geändert hat.  Hat sich der Apparat geändert, d.h. gibt es in der neuen
-Phase für eine Adresse keine Entsprechung in der vorhergehenden Phase,
-so werden die Defaultwerte eingetragen.  Zuerst muss festgestellt
-werden, wo Splitts oder Zusammenlegungen stattgefunden haben.  Dann
-werden diese Lesarten gelöscht und aus der vorhergehenden Phase kopiert.</p>
-<p>Stellen mit geänderter Leitzeile werden zunächst einfach übergangen.</p>
-<p>Defaultwerte eintragen, wenn eine variierte Stelle mit gleicher
-numerischer Adresse mehr Lesarten als in der vorhergehenden Phase hat,
-die nicht nur versionell bezeugt sind.</p>
-<p class="attribution">—VGA/PortCBGMInfoPh3.pl</p>
-</div></blockquote>
-<p>VarGenAtt_ActPh2 -&gt; VarGenAtt_ActPh3</p>
-<ol class="arabic simple">
-<li><p>copy entries from att with default values (every other labez depends on
-a) (done in the last step)</p></li>
-<li><p>overwrite with values from locstemed (done in this step)</p></li>
-</ol>
-<p>FIXME: do we really need step 1? To provide the new passages if the
-apparatus changed? At least it doesn’t do any damage because there should be
-no passages in att that are not in locstemed also.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.copy_genealogical">
+<span class="sig-name descname"><span class="pre">copy_genealogical</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dbdest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.copy_genealogical" title="Permalink to this definition">¶</a></dt>
+<dd><p>Copy and fix genealogical data for Acts</p>
+<p>This function is relevant only for Acts, where we had to import genealogical
+data from a previous implementation of the CBGM.  It is not used for new
+projects.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.copy_nestle">
-<code class="sig-name descname">copy_nestle</code><span class="sig-paren">(</span><em class="sig-param">dbdest</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.copy_nestle" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.copy_nestle">
+<span class="sig-name descname"><span class="pre">copy_nestle</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dbdest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.copy_nestle" title="Permalink to this definition">¶</a></dt>
 <dd><p>Make a working copy of the Nestle table.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.copy_table">
-<code class="sig-name descname">copy_table</code><span class="sig-paren">(</span><em class="sig-param">conn</em>, <em class="sig-param">source_table</em>, <em class="sig-param">dest_table</em>, <em class="sig-param">where=''</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.copy_table" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.copy_table">
+<span class="sig-name descname"><span class="pre">copy_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_table</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dest_table</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">where</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.copy_table" title="Permalink to this definition">¶</a></dt>
 <dd><p>Make a copy of a table.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.delete_corrector_hands">
-<code class="sig-name descname">delete_corrector_hands</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.delete_corrector_hands" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.delete_corrector_hands">
+<span class="sig-name descname"><span class="pre">delete_corrector_hands</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.delete_corrector_hands" title="Permalink to this definition">¶</a></dt>
 <dd><p>Delete later hands</p>
 <p>Delete all corrections except those by the first hand.</p>
 <blockquote>
 <div><p>Lesarten löschen, die nicht von der ersten Hand stammen.  […]
-Ausnahme: Bei Selbstkorrekturen wird die <em>-Lesart gelöscht und die
-C</em>-Lesart beibehalten.</p>
+Ausnahme: Bei Selbstkorrekturen wird die *-Lesart gelöscht und die
+C*-Lesart beibehalten.</p>
 <p class="attribution">—prepare4cbgm_6.py</p>
 </div></blockquote>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.delete_invariant_passages">
-<code class="sig-name descname">delete_invariant_passages</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.delete_invariant_passages" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.delete_invariant_passages">
+<span class="sig-name descname"><span class="pre">delete_invariant_passages</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.delete_invariant_passages" title="Permalink to this definition">¶</a></dt>
 <dd><p>Delete invariant passages</p>
 <p>A passage is invariant if all defined manuscripts offer the same
 (regularized) text.  Invariant passages are irrelevant to the CBGM.</p>
@@ -471,9 +464,9 @@ Varianten.</p>
 </div></blockquote>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.delete_lectionaries">
-<code class="sig-name descname">delete_lectionaries</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.delete_lectionaries" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.delete_lectionaries">
+<span class="sig-name descname"><span class="pre">delete_lectionaries</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.delete_lectionaries" title="Permalink to this definition">¶</a></dt>
 <dd><p>Delete secondary lectionary readings</p>
 <p>Also delete lectionary readings except L1.</p>
 <blockquote>
@@ -482,9 +475,9 @@ Varianten.</p>
 </div></blockquote>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.fill_apparatus_table">
-<code class="sig-name descname">fill_apparatus_table</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.fill_apparatus_table" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.fill_apparatus_table">
+<span class="sig-name descname"><span class="pre">fill_apparatus_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.fill_apparatus_table" title="Permalink to this definition">¶</a></dt>
 <dd><p>Fill the apparatus table with a positive apparatus.</p>
 <p id="transform-positive">The <a class="reference internal" href="database.html#ntg_common.db.Att" title="ntg_common.db.Att"><code class="xref py py-class docutils literal notranslate"><span class="pre">Att</span></code></a> table contains a negative apparatus.  A
 negative apparatus contains the text of the archetypus (manuscript ‘A’), but
@@ -508,33 +501,33 @@ every passage.</p>
 Datenbasis für CBGM</em></p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.fill_manuscripts_table">
-<code class="sig-name descname">fill_manuscripts_table</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.fill_manuscripts_table" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.fill_manuscripts_table">
+<span class="sig-name descname"><span class="pre">fill_manuscripts_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.fill_manuscripts_table" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create the Manuscripts and Ms_Ranges tables.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.fill_ms_cliques_table">
-<code class="sig-name descname">fill_ms_cliques_table</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.fill_ms_cliques_table" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.fill_ms_cliques_table">
+<span class="sig-name descname"><span class="pre">fill_ms_cliques_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.fill_ms_cliques_table" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create the ms_cliques table.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.fill_passages_table">
-<code class="sig-name descname">fill_passages_table</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.fill_passages_table" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.fill_passages_table">
+<span class="sig-name descname"><span class="pre">fill_passages_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.fill_passages_table" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create the Passages table.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.fill_readings_table">
-<code class="sig-name descname">fill_readings_table</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.fill_readings_table" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.fill_readings_table">
+<span class="sig-name descname"><span class="pre">fill_readings_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.fill_readings_table" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create the readings table.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.mark_invariant_passages">
-<code class="sig-name descname">mark_invariant_passages</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.mark_invariant_passages" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.mark_invariant_passages">
+<span class="sig-name descname"><span class="pre">mark_invariant_passages</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.mark_invariant_passages" title="Permalink to this definition">¶</a></dt>
 <dd><p>Mark invariant passages</p>
 <p>A passage is invariant if all defined manuscripts offer the same
 (regularized) text.  Invariant passages are irrelevant to the CBGM.</p>
@@ -557,9 +550,9 @@ nur 1 zurück, gibt es keine Varianten.</p>
 </div></blockquote>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.process_commentaries">
-<code class="sig-name descname">process_commentaries</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.process_commentaries" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.process_commentaries">
+<span class="sig-name descname"><span class="pre">process_commentaries</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.process_commentaries" title="Permalink to this definition">¶</a></dt>
 <dd><p>Process commentaries</p>
 <p>Commentaries often contain more than one reading of the same passage.  If
 those readings are different we must degrade them to uncertain status.</p>
@@ -578,9 +571,9 @@ deleted.</p>
 </div></blockquote>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.process_sigla">
-<code class="sig-name descname">process_sigla</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.process_sigla" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.process_sigla">
+<span class="sig-name descname"><span class="pre">process_sigla</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.process_sigla" title="Permalink to this definition">¶</a></dt>
 <dd><p>Process Sigla</p>
 <p>Rewrite the manuscript sigla (hs) and delete all suffixes.</p>
 <blockquote>
@@ -598,9 +591,9 @@ und ‘C*’.</p>
 </div></blockquote>
 </dd></dl>
 
-<dl class="function">
-<dt id="scripts.cceh.prepare.unroll_zw">
-<code class="sig-name descname">unroll_zw</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.unroll_zw" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.prepare.unroll_zw">
+<span class="sig-name descname"><span class="pre">unroll_zw</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.prepare.unroll_zw" title="Permalink to this definition">¶</a></dt>
 <dd><p>Unroll ‘zw’ entries</p>
 <p>When a reading cannot be classified under a labez with absolute certainty,
 the apparatus sets the labez to ‘zw’ (zweifelhaft, dubious) and offers a
@@ -625,7 +618,7 @@ oder b/bo_f).  In diesen Fällen tritt die Buchstabenkennung der
 
 </div>
 <div class="section" id="module-scripts.cceh.cbgm">
-<span id="scripts-cceh-cbgm"></span><h2>scripts.cceh.cbgm<a class="headerlink" href="#module-scripts.cceh.cbgm" title="Permalink to this headline">¶</a></h2>
+<span id="scripts-cceh-cbgm"></span><h2><a class="toc-backref" href="#id3">scripts.cceh.cbgm</a><a class="headerlink" href="#module-scripts.cceh.cbgm" title="Permalink to this headline">¶</a></h2>
 <p>Perform the CBGM.</p>
 <p>This script</p>
 <ul class="simple">
@@ -635,9 +628,9 @@ oder b/bo_f).  In diesen Fällen tritt die Buchstabenkennung der
 </ul>
 <p>This script updates the tables shown in red in the <a class="reference internal" href="database.html#db-overwiew"><span class="std std-ref">overview</span></a>.
 It also updates the Apparatus table where manuscript ‘A is concerned.</p>
-<dl class="function">
-<dt id="scripts.cceh.cbgm.build_A_text">
-<code class="sig-name descname">build_A_text</code><span class="sig-paren">(</span><em class="sig-param">dba</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.cbgm.build_A_text" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="scripts.cceh.cbgm.build_A_text">
+<span class="sig-name descname"><span class="pre">build_A_text</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scripts.cceh.cbgm.build_A_text" title="Permalink to this definition">¶</a></dt>
 <dd><p>Build the ‘A’ text</p>
 <p>The editors’ reconstruction of the archetype is recorded in the locstem
 table. This functions generates a virtual manuscript ‘A’ from those choices.</p>
@@ -651,13 +644,13 @@ in the reconstructed text.</p>
 
 </div>
 <div class="section" id="module-scripts.cceh.save_edits">
-<span id="scripts-cceh-save-edits"></span><h2>scripts.cceh.save_edits<a class="headerlink" href="#module-scripts.cceh.save_edits" title="Permalink to this headline">¶</a></h2>
+<span id="scripts-cceh-save-edits"></span><h2><a class="toc-backref" href="#id4">scripts.cceh.save_edits</a><a class="headerlink" href="#module-scripts.cceh.save_edits" title="Permalink to this headline">¶</a></h2>
 <p>Save the state of the editor tables.</p>
 <p>This script saves the tables containing the editorial decisions.  It does not
 save the apparatus tables.</p>
 </div>
 <div class="section" id="module-scripts.cceh.load_edits">
-<span id="scripts-cceh-load-edits"></span><h2>scripts.cceh.load_edits<a class="headerlink" href="#module-scripts.cceh.load_edits" title="Permalink to this headline">¶</a></h2>
+<span id="scripts-cceh-load-edits"></span><h2><a class="toc-backref" href="#id5">scripts.cceh.load_edits</a><a class="headerlink" href="#module-scripts.cceh.load_edits" title="Permalink to this headline">¶</a></h2>
 <p>Load a saved state of the editor tables.</p>
 <p>This script loads the state of the tables with the editorial decisions as saved
 by the save_edits.py script.  It does not touch the apparatus tables.</p>
@@ -667,8 +660,9 @@ to the default of: reading ‘a’ is original and every other reading is derive
 from ‘a’.</p>
 </div>
 <div class="section" id="module-scripts.cceh.mk_users">
-<span id="scripts-cceh-mk-users"></span><h2>scripts.cceh.mk_users<a class="headerlink" href="#module-scripts.cceh.mk_users" title="Permalink to this headline">¶</a></h2>
+<span id="scripts-cceh-mk-users"></span><h2><a class="toc-backref" href="#id6">scripts.cceh.mk_users</a><a class="headerlink" href="#module-scripts.cceh.mk_users" title="Permalink to this headline">¶</a></h2>
 <p>Initialize the database for user authentication and authorization.</p>
+<p>Creates the tables and inserts the admin user.</p>
 </div>
 </div>
 
@@ -677,29 +671,29 @@ from ‘a’.</p>
            
           </div>
           <footer>
-  
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="database.html" class="btn btn-neutral float-right" title="Database Structure" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="server_dev.html" class="btn btn-neutral float-left" title="API Server" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+        <a href="database.html" class="btn btn-neutral float-right" title="Database Structure" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="server_config.html" class="btn btn-neutral float-left" title="API Server Configuration Files" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2016-19 CCeH - Licensed under the GNU GPL v3 or later
+        &#169; Copyright 2016-20 CCeH - Licensed under the GNU GPL v3 or later.
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
-
         </div>
       </div>
 
@@ -707,7 +701,6 @@ from ‘a’.</p>
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

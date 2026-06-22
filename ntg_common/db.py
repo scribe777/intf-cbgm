@@ -783,7 +783,7 @@ class TTS_Mixin (object):
 
     @declared_attr
     def user_id_start (cls):
-        return Column (Integer,    nullable = False)
+        return Column (Integer,    nullable = True)
 
     @declared_attr
     def user_id_stop (cls):

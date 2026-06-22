@@ -1,0 +1,21 @@
+APPLICATION_NAME    = "Root"
+APPLICATION_ROOT    = "/api/"
+
+AFTER_LOGIN_URL     = "http://localhost"
+
+SESSION_COOKIE_PATH = "/"
+SECRET_KEY          = "top-secret-key"
+
+PGHOST="localhost"
+PGPORT="5432"
+PGDATABASE="ntg_user"
+PGUSER="ntg"
+
+USER_APP_NAME="NTG"
+USER_PASSWORD_HASH="pbkdf2_sha512"
+USER_PASSWORD_SALT="top-secret-salt"
+
+MAIL_SERVER  = "localhost"
+MAIL_PORT    = 25
+MAIL_USE_TLS = False
+MAIL_DEFAULT_SENDER = "Local NTG Dev Server"

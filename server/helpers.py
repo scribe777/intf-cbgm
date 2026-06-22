@@ -74,9 +74,9 @@ class Bag ():
 class Manuscript ():
     """ Represent one manuscript. """
 
-    RE_HSNR = re.compile (r'^\d{6}$')                      # 300180
-    RE_MSID = re.compile (r'^id\d+$')                      # id123
-    RE_HS   = re.compile (r'^([PL]?[s\d]+|A|MT)$', re.I)   # 01.
+    RE_HSNR = re.compile (r'^\d{6}$')                      # 6 digits, e.g.: 300180
+    RE_MSID = re.compile (r'^id\d+$')                      # "id" and digits, e.g.: id123
+    RE_HS   = re.compile (r'^([PL]?[s\d]+|A|MT|F1)$', re.I)   # all other formats such as "MT" or "F1"
 
     def __init__ (self, conn, manuscript_id_or_hs_or_hsnr):
         """ Initialize from manuscript id or hs or hsnr. """

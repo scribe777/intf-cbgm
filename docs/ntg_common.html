@@ -1,44 +1,50 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Various Functions &mdash; NTG 0.1.1 documentation</title>
+  <title>Common Functions &mdash; NTG 0.1.1 documentation</title>
   
-
-  
-  
-  
-  
-
-  
-  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
-  
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-
-    
 
   
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/my_theme.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Database Structure" href="database.html" /> 
+    <link rel="next" title="ntg.uni-muenster.de" href="vm.html" />
+    <link rel="prev" title="Database FAQ" href="database_faq.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -72,6 +78,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -81,11 +88,10 @@
             
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#web-application">Web Application</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#preparing-the-database-for-the-cbgm">Preparing the Database for the CBGM</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#applying-the-cbgm">Applying the CBGM</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#updating-the-apparatus">Updating the Apparatus</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#links">Links</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#basic-terms-and-procedures-of-the-coherence-based-genealogical-method-cbgm">Basic Terms and Procedures of the Coherence-Based Genealogical Method (CBGM)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="intro.html#links">Links</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a><ul>
@@ -102,6 +108,7 @@
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#install">Install</a></li>
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#running-the-web-application">Running the web application</a></li>
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#running-the-cbgm">Running the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="install-docker.html#troubleshooting">Troubleshooting</a></li>
 </ul>
 </li>
 </ul>
@@ -124,54 +131,8 @@
 </ul>
 </li>
 <li class="toctree-l1 current"><a class="reference internal" href="developer.html">Developer Manual</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="domain.html">Introduction to the Problem Domain (German)</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#das-neue-testament">Das Neue Testament</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#editionen">Editionen</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#die-textzeugen">Die Textzeugen</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#textformen-texttypen">Textformen (Texttypen)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#textkritik">Textkritik</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#terminologie">Terminologie</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#literatur">Literatur</a></li>
-</ul>
-</li>
 <li class="toctree-l2"><a class="reference internal" href="client_dev.html">Web Client</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-app">client/app</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-apparatus">client/apparatus</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-coherence">client/coherence</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison">client/comparison</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison-details-table">client/comparison_details_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison-table">client/comparison_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-chord-layout">client/d3_chord_layout</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-common">client/d3_common</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-stemma-layout">client/d3_stemma_layout</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-find-relatives">client/find_relatives</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-flash-messages">client/flash_messages</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-leitzeile">client/leitzeile</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-local-stemma">client/local_stemma</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-notes">client/notes</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-notes-list">client/notes_list</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-optimal-substemma">client/optimal_substemma</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-optimal-substemma-details">client/optimal_substemma_details</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-page-header">client/page_header</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-project-list">client/project_list</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-relatives-metrics">client/relatives_metrics</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-relatives-table">client/relatives_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-set-cover">client/set_cover</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-table-sort-mixin">client/table_sort_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-table-toggle-mixin">client/table_toggle_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-textflow">client/textflow</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-tools">client/tools</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-autocomplete">client/widgets/autocomplete</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-button-group">client/widgets/button_group</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-card">client/widgets/card</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-card-caption">client/widgets/card_caption</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-connectivity">client/widgets/connectivity</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-context-menu">client/widgets/context_menu</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-dropdown-mixin">client/widgets/dropdown_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-labezator">client/widgets/labezator</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-navigator">client/widgets/navigator</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-range">client/widgets/range</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-toolbar">client/widgets/toolbar</a></li>
+<li class="toctree-l3"><a class="reference internal" href="client_dev.html#module-client-app">Modules</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="server_dev.html">API Server</a><ul>
@@ -185,6 +146,12 @@
 <li class="toctree-l3"><a class="reference internal" href="server_dev.html#module-server.helpers">server.helpers</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="server_config.html">API Server Configuration Files</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#per-application-configuration-files">Per-Application Configuration Files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#global-configuration-file">Global Configuration File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#footnotes">Footnotes</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="scripts_dev.html">Scripts</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="scripts_dev.html#module-scripts.cceh.import">scripts.cceh.import</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scripts_dev.html#module-scripts.cceh.prepare">scripts.cceh.prepare</a></li>
@@ -196,13 +163,49 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="database.html">Database Structure</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="database.html#cbgm-database">CBGM Database</a></li>
-<li class="toctree-l3"><a class="reference internal" href="database.html#source-database">Source Database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#source-databases">Source Databases</a></li>
 <li class="toctree-l3"><a class="reference internal" href="database.html#literature">Literature</a></li>
 </ul>
 </li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Various Functions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="database_faq.html">Database FAQ</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="database_faq.html#manual-editing-of-journalled-tables">Manual Editing of Journalled Tables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database_faq.html#apparatus-updates">Apparatus Updates</a></li>
+</ul>
+</li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Common Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-ntg_common.cbgm_common">ntg_common.cbgm_common</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-ntg_common.config">ntg_common.config</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#module-ntg_common.db_tools">ntg_common.db_tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-ntg_common.exceptions">ntg_common.exceptions</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#module-ntg_common.tools">ntg_common.tools</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="vm.html">ntg.uni-muenster.de</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#apache">Apache</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#api-server">API Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#postgres">Postgres</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#users">Users</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#backups">Backups</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#icinga">Icinga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#openstack-cloud">OpenStack Cloud</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cbgm.html">CBGM</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#preparing-the-database-for-the-cbgm">Preparing the Database for the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#applying-the-cbgm">Applying the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-project">Starting a New Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-phase">Starting a New Phase</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-phase-with-apparatus-update">Starting a New Phase With Apparatus Update</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="user_management.html">User Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="user_management.html#manual-user-management">Manual User Management</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="technologies.html">Technologies Used</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#server">Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#client">Client</a></li>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#scripts">Scripts</a></li>
 </ul>
 </li>
 </ul>
@@ -212,6 +215,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -246,20 +250,22 @@
 
 
 
+
+
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="index.html">Docs</a> &raquo;</li>
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
         
           <li><a href="developer.html">Developer Manual</a> &raquo;</li>
         
-      <li>Various Functions</li>
+      <li>Common Functions</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
-            
+          
             <a href="_sources/ntg_common.rst.txt" rel="nofollow"> View page source</a>
           
         
@@ -273,24 +279,326 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <span class="target" id="module-ntg_common"></span><div class="section" id="various-functions">
-<h1>Various Functions<a class="headerlink" href="#various-functions" title="Permalink to this headline">¶</a></h1>
+  <span class="target" id="module-ntg_common"></span><div class="section" id="common-functions">
+<h1>Common Functions<a class="headerlink" href="#common-functions" title="Permalink to this headline">¶</a></h1>
+<p>Here are the functions used by the server and the commandline scripts.</p>
+<div class="section" id="module-ntg_common.cbgm_common">
+<span id="ntg-common-cbgm-common"></span><h2>ntg_common.cbgm_common<a class="headerlink" href="#module-ntg_common.cbgm_common" title="Permalink to this headline">¶</a></h2>
+<p>Common routines for the CBGM.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params">
+<em class="property"><span class="pre">class</span> </em><span class="sig-name descname"><span class="pre">CBGM_Params</span></span><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params" title="Permalink to this definition">¶</a></dt>
+<dd><p>Structure that holds intermediate results of the CBGM.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.ancestor_matrix">
+<span class="sig-name descname"><span class="pre">ancestor_matrix</span></span><em class="property"> <span class="pre">=</span> <span class="pre">None</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.ancestor_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Integer matrix (ranges x mss x mss) with counts of the passages that are
+older in ms1 than in ms2.  This matrix is asymmetrical.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.and_matrix">
+<span class="sig-name descname"><span class="pre">and_matrix</span></span><em class="property"> <span class="pre">=</span> <span class="pre">None</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.and_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Integer matrix (ranges x mss x mss) with counts of the passages that are
+defined in both mss.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.def_matrix">
+<span class="sig-name descname"><span class="pre">def_matrix</span></span><em class="property"> <span class="pre">=</span> <span class="pre">None</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.def_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Boolean matrix (mss x passages) set if ms. is defined at passage.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.eq_matrix">
+<span class="sig-name descname"><span class="pre">eq_matrix</span></span><em class="property"> <span class="pre">=</span> <span class="pre">None</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.eq_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Integer matrix (ranges x mss x mss) with counts of the passages that are
+equal in both mss.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.labez_matrix">
+<span class="sig-name descname"><span class="pre">labez_matrix</span></span><em class="property"> <span class="pre">=</span> <span class="pre">None</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.labez_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Integer matrix (mss x passages) of labez.  Each entry represents one reading:
+0 = lacuna, 1 = ‘a’, 2 = ‘b’, …  Used by the pre-coherence computations.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.n_mss">
+<span class="sig-name descname"><span class="pre">n_mss</span></span><em class="property"> <span class="pre">=</span> <span class="pre">0</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.n_mss" title="Permalink to this definition">¶</a></dt>
+<dd><p>No. of manuscripts</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.n_passages">
+<span class="sig-name descname"><span class="pre">n_passages</span></span><em class="property"> <span class="pre">=</span> <span class="pre">0</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.n_passages" title="Permalink to this definition">¶</a></dt>
+<dd><p>No. of passages</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.n_ranges">
+<span class="sig-name descname"><span class="pre">n_ranges</span></span><em class="property"> <span class="pre">=</span> <span class="pre">0</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.n_ranges" title="Permalink to this definition">¶</a></dt>
+<dd><p>No. of ranges</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.parent_matrix">
+<span class="sig-name descname"><span class="pre">parent_matrix</span></span><em class="property"> <span class="pre">=</span> <span class="pre">None</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.parent_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Integer matrix (ranges x mss x mss) with counts of the passages that are
+older in ms1 than in ms2, using only immediate descendence.  This matrix is
+asymmetrical.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.ranges">
+<span class="sig-name descname"><span class="pre">ranges</span></span><em class="property"> <span class="pre">=</span> <span class="pre">None</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.ranges" title="Permalink to this definition">¶</a></dt>
+<dd><p>list of (named tuple Range)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.unclear_ancestor_matrix">
+<span class="sig-name descname"><span class="pre">unclear_ancestor_matrix</span></span><em class="property"> <span class="pre">=</span> <span class="pre">None</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.unclear_ancestor_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Integer matrix (ranges x mss x mss) with counts of the passages whose
+relationship is unclear in ms1 and ms2.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.unclear_parent_matrix">
+<span class="sig-name descname"><span class="pre">unclear_parent_matrix</span></span><em class="property"> <span class="pre">=</span> <span class="pre">None</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.unclear_parent_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Integer matrix (ranges x mss x mss) with counts of the passages whose
+relationship is unclear in ms1 and ms2, using only immediate descendence.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.CBGM_Params.variant_matrix">
+<span class="sig-name descname"><span class="pre">variant_matrix</span></span><em class="property"> <span class="pre">=</span> <span class="pre">None</span></em><a class="headerlink" href="#ntg_common.cbgm_common.CBGM_Params.variant_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Boolean (1 x passages) matrix of invariant passages.  We will need this the
+day we decide <em>not</em> to eliminate all invariant readings from the
+database.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.calculate_mss_similarity_postco">
+<span class="sig-name descname"><span class="pre">calculate_mss_similarity_postco</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">do_checks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.cbgm_common.calculate_mss_similarity_postco" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate post-coherence mss similarity</p>
+<p>Genealogical coherence outputs asymmetrical matrices.
+Loop over all mss O(n_mss² * n_ranges * n_passages).</p>
+<p>The main idea in this function is to get the DAG (directed acyclic graph)
+into a representation that can be used by numpy.  Numpy gives us a
+tremendous speed boost.</p>
+<p>For every passage and every reading we build</p>
+<ul class="simple">
+<li><p>a bitmask for the reading and</p></li>
+<li><p>a bitmask for all prior readings of this reading.</p></li>
+</ul>
+<p>Then for every passage and every manuscript we look up what the manuscript
+offers and store the relative bitmasks in 2 matrices.</p>
+<p>For illustration we refer to this passage (Mc 10:10/16-22 pass_id == 3240):</p>
+<p>In a first step every reading (labez and clique) gets assigned a bitmask:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>labez | clique |                               mask
+------+--------+-----------------------------------------------------------------
+?     |        | 0000000000000000000000000000000000000000000000000000000000000001
+a     | 1      | 0000000000000000000000000000000000000000000000000000000000000010
+a     | 2      | 0000000000000000000000000000000000000000000000000000000000000100
+b     | 1      | 0000000000000000000000000000000000000000000000000000000000001000
+c     | 1      | 0000000000000000000000000000000000000000000000000000000000010000
+c     | 2      | 0000000000000000000000000000000000000000000000000000000000100000
+c     | 3      | 0000000000000000000000000000000000000000000000000000000001000000
+d     | 1      | 0000000000000000000000000000000000000000000000000000000010000000
+d     | 2      | 0000000000000000000000000000000000000000000000000000000100000000
+e     | 1      | 0000000000000000000000000000000000000000000000000000001000000000
+f     | 1      | 0000000000000000000000000000000000000000000000000000010000000000
+f     | 2      | 0000000000000000000000000000000000000000000000000000100000000000
+g     | 1      | 0000000000000000000000000000000000000000000000000001000000000000
+h     | 1      | 0000000000000000000000000000000000000000000000000010000000000000
+i     | 1      | 0000000000000000000000000000000000000000000000000100000000000000
+j     | 1      | 0000000000000000000000000000000000000000000000001000000000000000
+k     | 1      | 0000000000000000000000000000000000000000000000010000000000000000
+l     | 1      | 0000000000000000000000000000000000000000000000100000000000000000
+m     | 1      | 0000000000000000000000000000000000000000000001000000000000000000
+n     | 1      | 0000000000000000000000000000000000000000000010000000000000000000
+o     | 1      | 0000000000000000000000000000000000000000000100000000000000000000
+p     | 1      | 0000000000000000000000000000000000000000001000000000000000000000
+q     | 1      | 0000000000000000000000000000000000000000010000000000000000000000
+r     | 1      | 0000000000000000000000000000000000000000100000000000000000000000
+s     | 1      | 0000000000000000000000000000000000000001000000000000000000000000
+t     | 1      | 0000000000000000000000000000000000000010000000000000000000000000
+u     | 1      | 0000000000000000000000000000000000000100000000000000000000000000
+v     | 1      | 0000000000000000000000000000000000001000000000000000000000000000
+v     | 2      | 0000000000000000000000000000000000010000000000000000000000000000
+v     | 3      | 0000000000000000000000000000000000100000000000000000000000000000
+w     | 1      | 0000000000000000000000000000000001000000000000000000000000000000
+</pre></div>
+</div>
+<p>Note that we have an extra bitmask for ‘?’.  This allows quick testing for
+unknown origin.</p>
+<p>In the second step we build the ancestor bitmasks.</p>
+<p>Reading ‘f’ has prior readings ‘c’, ‘m’, and ‘a’.  Thus the ancestor bitmask
+for reading ‘f’ is the bitwise_or of the masks for ‘c’, ‘m’, and ‘a’:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>labez | clique |                               mask
+------+--------+-----------------------------------------------------------------
+c     | 1      | 0000000000000000000000000000000000000000000000000000000000010000
+m     | 1      | 0000000000000000000000000000000000000000000001000000000000000000
+a     | 1      | 0000000000000000000000000000000000000000000000000000000000000010
+
+labez | clique |                            ancestor mask
+------+--------+-----------------------------------------------------------------
+f     | 1      | 0000000000000000000000000000000000000000000001000000000000010010
+</pre></div>
+</div>
+<p>Another example: Reading ‘w’ has prior readings ‘a2’, ‘a2’ is of unknown
+origin. The ancestor mask for ‘w’ is the bitwise_or of the masks for ‘a2’ and ‘?’:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>labez | clique |                               mask
+------+--------+-----------------------------------------------------------------
+a     | 2      | 0000000000000000000000000000000000000000000000000000000000000100
+?     |        | 0000000000000000000000000000000000000000000000000000000000000001
+
+labez | clique |                            ancestor mask
+------+--------+-----------------------------------------------------------------
+w     | 1      | 0000000000000000000000000000000000000000000000000000000000000101
+</pre></div>
+</div>
+<p>After building the masks for every reading at every passage we put the masks
+into 2 matrices of dimension (mss x passages), the mask_matrix and the
+ancestor_matrix.  The mask_matrix contains the mask for the reading the
+manuscript offers, the ancestor_matrix contains the ancestor mask for that reading.</p>
+<p>Manuscript 1457 (ms_id == 156) (at pass_id == 3240) reads ‘c’, so the
+mask_matrix contains:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mask_matrix</span><span class="p">[</span><span class="mi">156</span><span class="p">,</span><span class="mi">3240</span><span class="p">]</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;0000000000000000000000000000000000000000000000000000000000010000&#39;</span>
+</pre></div>
+</div>
+<p>Manuscript 706 (ms_id == 102) (at pass_id == 3240) reads ‘f’, so the
+ancestor_matrix contains:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ancestor_matrix</span><span class="p">[</span><span class="mi">102</span><span class="p">,</span><span class="mi">3240</span><span class="p">]</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;0000000000000000000000000000000000000000000001000000000000010010&#39;</span>
+</pre></div>
+</div>
+<p>To test for ancestrality between mss. 1457 and 706 we do a bitwise_and of the
+mask_matrix of 1457 and the ancestor_matrix of 706. If the result is non-zero then
+1457 is ancestral to 706.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">is_ancestral</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bitwise_and</span> <span class="p">(</span><span class="n">mask_matrix</span><span class="p">[</span><span class="mi">156</span><span class="p">,</span><span class="mi">3240</span><span class="p">],</span> <span class="n">ancestor_matrix</span><span class="p">[</span><span class="mi">102</span><span class="p">,</span><span class="mi">3240</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p>But that would be very slow.  Numpy allows to operate on whole matrix rows
+at a time so we can calculate the ancestrality for all passages with a
+single call to numpy.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">is_ancestral</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bitwise_and</span> <span class="p">(</span><span class="n">mask_matrix</span><span class="p">[</span><span class="mi">156</span><span class="p">],</span> <span class="n">ancestor_matrix</span><span class="p">[</span><span class="mi">102</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p>is_ancestral is an array of booleans.  We only have to count how many
+elements of it are True to obtain the number of prior readings.</p>
+<p>Reversing the role of the two manuscripts (mask_matrix and ancestor_matrix)
+gives us the number of posterior readings.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.calculate_mss_similarity_preco">
+<span class="sig-name descname"><span class="pre">calculate_mss_similarity_preco</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">_dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_parameters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.cbgm_common.calculate_mss_similarity_preco" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate pre-coherence mss similarity</p>
+<p>The pre-coherence similarity is defined as:</p>
+<div class="math notranslate nohighlight">
+\[\mbox{similarity}=\frac{\mbox{equal passages}}{\mbox{passages in common}}\]</div>
+<blockquote>
+<div><p>Kapitelweise füllen auf Basis von Vergleichen einzelner
+Variantenspektren in ECM_Acts_Sp.  Vergleich von je zwei Handschriften:
+An wieviel Stellen haben sie gemeinsam Text, an wieviel Stellen stimmen
+sie überein bzw. unterscheiden sie sich (inklusive Quotient)?  Die
+Informationen werden sowohl auf Kapitel- wie auch Buchebene
+festgehalten.</p>
+<p class="attribution">—VGA/VG05_all3.pl</p>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.count_by_range">
+<span class="sig-name descname"><span class="pre">count_by_range</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range_starts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range_ends</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.cbgm_common.count_by_range" title="Permalink to this definition">¶</a></dt>
+<dd><p>Count true bits in array ranges</p>
+<p>Count the bits that are true in multiple ranges of the same array of booleans.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a</strong> (<em>np.Array of np.bool:</em>) – Input array</p></li>
+<li><p><strong>range_starts</strong> (<em>int</em><em>[</em><em>]</em>) – Starting offsets of the ranges to count.</p></li>
+<li><p><strong>range_ends</strong> (<em>int</em><em>[</em><em>]</em>) – Ending offsets of the ranges to count.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.create_labez_matrix">
+<span class="sig-name descname"><span class="pre">create_labez_matrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.cbgm_common.create_labez_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create the <code class="xref py py-attr docutils literal notranslate"><span class="pre">labez</span> <span class="pre">matrix</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.cbgm_common.write_affinity_table">
+<span class="sig-name descname"><span class="pre">write_affinity_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dba</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.cbgm_common.write_affinity_table" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write back the new affinity (and ms_ranges) tables.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-ntg_common.config">
+<span id="ntg-common-config"></span><h2>ntg_common.config<a class="headerlink" href="#module-ntg_common.config" title="Permalink to this headline">¶</a></h2>
+<p>The commandline and configuration stuff.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ntg_common.config.Formatter">
+<em class="property"><span class="pre">class</span> </em><span class="sig-name descname"><span class="pre">Formatter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fmt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">datefmt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">style</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'%'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.config.Formatter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Logging formatter. Allows colorful formatting of log lines.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="ntg_common.config.Formatter.format">
+<span class="sig-name descname"><span class="pre">format</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">record</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.config.Formatter.format" title="Permalink to this definition">¶</a></dt>
+<dd><p>Format the specified record as text.</p>
+<p>The record’s attribute dictionary is used as the operand to a
+string formatting operation which yields the returned string.
+Before formatting the dictionary, a couple of preparatory steps
+are carried out. The message attribute of the record is computed
+using LogRecord.getMessage(). If the formatting string uses the
+time (as determined by a call to usesTime(), formatTime() is
+called to format the event time. If there is exception information,
+it is formatted using formatException() and appended to the message.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ntg_common.config.args">
+<span class="sig-name descname"><span class="pre">args</span></span><em class="property"> <span class="pre">=</span> <span class="pre">&lt;ntg_common.config.Args</span> <span class="pre">object&gt;</span></em><a class="headerlink" href="#ntg_common.config.args" title="Permalink to this definition">¶</a></dt>
+<dd><p>Globally accessible arguments from command line.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.config.config_from_pyfile">
+<span class="sig-name descname"><span class="pre">config_from_pyfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.config.config_from_pyfile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Emulate the Flask config file parser.</p>
+<p>Emulate the Flask config file parser so we can use the same config files for
+the server and the commandline script.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.config.init_logging">
+<span class="sig-name descname"><span class="pre">init_logging</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">handlers</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.config.init_logging" title="Permalink to this definition">¶</a></dt>
+<dd><p>Init the logging stuff.</p>
+</dd></dl>
+
+</div>
 <div class="section" id="module-ntg_common.db_tools">
 <span id="ntg-common-db-tools"></span><h2>ntg_common.db_tools<a class="headerlink" href="#module-ntg_common.db_tools" title="Permalink to this headline">¶</a></h2>
 <p>This module contains functions for database access.</p>
-<dl class="class">
-<dt id="ntg_common.db_tools.MySQLEngine">
-<em class="property">class </em><code class="sig-name descname">MySQLEngine</code><span class="sig-paren">(</span><em class="sig-param">fn=('/etc/my.cnf'</em>, <em class="sig-param">'/etc/mysql/my.cnf'</em>, <em class="sig-param">'~/.my.cnf')</em>, <em class="sig-param">group=('mysql'</em>, <em class="sig-param">'client'</em>, <em class="sig-param">'client-server'</em>, <em class="sig-param">'client-mariadb')</em>, <em class="sig-param">db=''</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.MySQLEngine" title="Permalink to this definition">¶</a></dt>
+<dl class="py class">
+<dt class="sig sig-object py" id="ntg_common.db_tools.MySQLEngine">
+<em class="property"><span class="pre">class</span> </em><span class="sig-name descname"><span class="pre">MySQLEngine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">('/etc/my.cnf',</span> <span class="pre">'/etc/mysql/my.cnf',</span> <span class="pre">'~/.my.cnf')</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">('mysql',</span> <span class="pre">'client',</span> <span class="pre">'client-server',</span> <span class="pre">'client-mariadb')</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">db</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.MySQLEngine" title="Permalink to this definition">¶</a></dt>
 <dd><p>Database Interface</p>
 </dd></dl>
 
-<dl class="class">
-<dt id="ntg_common.db_tools.PostgreSQLEngine">
-<em class="property">class </em><code class="sig-name descname">PostgreSQLEngine</code><span class="sig-paren">(</span><em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.PostgreSQLEngine" title="Permalink to this definition">¶</a></dt>
+<dl class="py class">
+<dt class="sig sig-object py" id="ntg_common.db_tools.PostgreSQLEngine">
+<em class="property"><span class="pre">class</span> </em><span class="sig-name descname"><span class="pre">PostgreSQLEngine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.PostgreSQLEngine" title="Permalink to this definition">¶</a></dt>
 <dd><p>PostgreSQL Database Interface</p>
-<dl class="method">
-<dt id="ntg_common.db_tools.PostgreSQLEngine.get_connection_params">
-<code class="sig-name descname">get_connection_params</code><span class="sig-paren">(</span><em class="sig-param">args={}</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.PostgreSQLEngine.get_connection_params" title="Permalink to this definition">¶</a></dt>
+<dl class="py method">
+<dt class="sig sig-object py" id="ntg_common.db_tools.PostgreSQLEngine.get_connection_params">
+<span class="sig-name descname"><span class="pre">get_connection_params</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.PostgreSQLEngine.get_connection_params" title="Permalink to this definition">¶</a></dt>
 <dd><p>Get sqlalchemy connection parameters.</p>
 <p>Try to get the connection parameters in turn from these sources:</p>
 <ol class="arabic simple">
@@ -303,30 +611,30 @@
 the file <code class="file docutils literal notranslate"><span class="pre">~/.pgpass</span></code>.  It should be configured there.</p>
 </dd></dl>
 
-<dl class="method">
-<dt id="ntg_common.db_tools.PostgreSQLEngine.receive_checkout">
-<em class="property">static </em><code class="sig-name descname">receive_checkout</code><span class="sig-paren">(</span><em class="sig-param">dbapi_connection</em>, <em class="sig-param">_connection_record</em>, <em class="sig-param">_connection_proxy</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.PostgreSQLEngine.receive_checkout" title="Permalink to this definition">¶</a></dt>
+<dl class="py method">
+<dt class="sig sig-object py" id="ntg_common.db_tools.PostgreSQLEngine.receive_checkout">
+<em class="property"><span class="pre">static</span> </em><span class="sig-name descname"><span class="pre">receive_checkout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dbapi_connection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_connection_record</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_connection_proxy</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.PostgreSQLEngine.receive_checkout" title="Permalink to this definition">¶</a></dt>
 <dd><p>Set a default for the postgres variable ntg.user_id that is used by
 <a class="reference internal" href="database.html#tts"><span class="std std-ref">Transaction-Time State Tables</span></a> tables.</p>
 </dd></dl>
 
-<dl class="method">
-<dt id="ntg_common.db_tools.PostgreSQLEngine.vacuum">
-<code class="sig-name descname">vacuum</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.PostgreSQLEngine.vacuum" title="Permalink to this definition">¶</a></dt>
+<dl class="py method">
+<dt class="sig sig-object py" id="ntg_common.db_tools.PostgreSQLEngine.vacuum">
+<span class="sig-name descname"><span class="pre">vacuum</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.PostgreSQLEngine.vacuum" title="Permalink to this definition">¶</a></dt>
 <dd><p>Vacuum the database.</p>
 </dd></dl>
 
-<dl class="method">
-<dt id="ntg_common.db_tools.PostgreSQLEngine.wait_for_server">
-<code class="sig-name descname">wait_for_server</code><span class="sig-paren">(</span><em class="sig-param">retries=60</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.PostgreSQLEngine.wait_for_server" title="Permalink to this definition">¶</a></dt>
+<dl class="py method">
+<dt class="sig sig-object py" id="ntg_common.db_tools.PostgreSQLEngine.wait_for_server">
+<span class="sig-name descname"><span class="pre">wait_for_server</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">retries</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">60</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.PostgreSQLEngine.wait_for_server" title="Permalink to this definition">¶</a></dt>
 <dd><p>Wait for the Postgres server to come up.</p>
 </dd></dl>
 
 </dd></dl>
 
-<dl class="function">
-<dt id="ntg_common.db_tools.fix">
-<code class="sig-name descname">fix</code><span class="sig-paren">(</span><em class="sig-param">conn</em>, <em class="sig-param">msg</em>, <em class="sig-param">check_sql</em>, <em class="sig-param">fix_sql</em>, <em class="sig-param">parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.fix" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.db_tools.fix">
+<span class="sig-name descname"><span class="pre">fix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_sql</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fix_sql</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.fix" title="Permalink to this definition">¶</a></dt>
 <dd><p>Check and eventually fix errors.</p>
 <p>Executes the check_sql statement to check for a possible error conditions
 and, if rows emerge, prints a warning and executes the fix_sql statement.
@@ -344,34 +652,34 @@ reports an error if the error condition still exists.</p>
 </dl>
 </dd></dl>
 
-<dl class="function">
-<dt id="ntg_common.db_tools.init_default_cliques">
-<code class="sig-name descname">init_default_cliques</code><span class="sig-paren">(</span><em class="sig-param">conn</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.init_default_cliques" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.db_tools.init_default_cliques">
+<span class="sig-name descname"><span class="pre">init_default_cliques</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.init_default_cliques" title="Permalink to this definition">¶</a></dt>
 <dd><p>Generate a default cliques table.</p>
 <p>In a default cliques table there is a default clique ‘1’ for every reading
 in the readings table.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="ntg_common.db_tools.init_default_locstem">
-<code class="sig-name descname">init_default_locstem</code><span class="sig-paren">(</span><em class="sig-param">conn</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.init_default_locstem" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.db_tools.init_default_locstem">
+<span class="sig-name descname"><span class="pre">init_default_locstem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.init_default_locstem" title="Permalink to this definition">¶</a></dt>
 <dd><p>Generate a default locstem table.</p>
 <p>In a default LocStemEd, labez ‘a’ is the original reading and every other
 reading depends on labez ‘a’, except in a Fehlvers, where ‘b’ is of unknown
 origin and every other reading depends on ‘b’.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="ntg_common.db_tools.init_default_ms_cliques">
-<code class="sig-name descname">init_default_ms_cliques</code><span class="sig-paren">(</span><em class="sig-param">conn</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.init_default_ms_cliques" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.db_tools.init_default_ms_cliques">
+<span class="sig-name descname"><span class="pre">init_default_ms_cliques</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.init_default_ms_cliques" title="Permalink to this definition">¶</a></dt>
 <dd><p>Generate a default ms_cliques table.</p>
 <p>In a default ms_cliques table there is a default clique ‘1’ for every reading
 in the apparatus table.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="ntg_common.db_tools.local_stemma_to_nx">
-<code class="sig-name descname">local_stemma_to_nx</code><span class="sig-paren">(</span><em class="sig-param">conn</em>, <em class="sig-param">pass_id</em>, <em class="sig-param">add_isolated_roots=False</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.local_stemma_to_nx" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.db_tools.local_stemma_to_nx">
+<span class="sig-name descname"><span class="pre">local_stemma_to_nx</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pass_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_isolated_roots</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.local_stemma_to_nx" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load a passage from the database into an nx Graph.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -381,50 +689,69 @@ isolated.  Needed in edit mode.</p>
 </dl>
 </dd></dl>
 
-<dl class="function">
-<dt id="ntg_common.db_tools.tabulate">
-<code class="sig-name descname">tabulate</code><span class="sig-paren">(</span><em class="sig-param">res</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.tabulate" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.db_tools.tabulate">
+<span class="sig-name descname"><span class="pre">tabulate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">res</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.db_tools.tabulate" title="Permalink to this definition">¶</a></dt>
 <dd><p>Format and output a rowset</p>
 <p>Uses an output format similar to the one produced by the mysql commandline
 utility.</p>
 </dd></dl>
 
 </div>
+<div class="section" id="module-ntg_common.exceptions">
+<span id="ntg-common-exceptions"></span><h2>ntg_common.exceptions<a class="headerlink" href="#module-ntg_common.exceptions" title="Permalink to this headline">¶</a></h2>
+<dl class="py exception">
+<dt class="sig sig-object py" id="ntg_common.exceptions.EditError">
+<em class="property"><span class="pre">exception</span> </em><span class="sig-name descname"><span class="pre">EditError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">status_code</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">payload</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.exceptions.EditError" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="ntg_common.exceptions.EditException">
+<em class="property"><span class="pre">exception</span> </em><span class="sig-name descname"><span class="pre">EditException</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">status_code</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">payload</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.exceptions.EditException" title="Permalink to this definition">¶</a></dt>
+<dd><p>See: <a class="reference external" href="http://flask.pocoo.org/docs/0.12/patterns/apierrors/">http://flask.pocoo.org/docs/0.12/patterns/apierrors/</a></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="ntg_common.exceptions.PrivilegeError">
+<em class="property"><span class="pre">exception</span> </em><span class="sig-name descname"><span class="pre">PrivilegeError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">status_code</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">payload</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.exceptions.PrivilegeError" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
 <div class="section" id="module-ntg_common.tools">
 <span id="ntg-common-tools"></span><h2>ntg_common.tools<a class="headerlink" href="#module-ntg_common.tools" title="Permalink to this headline">¶</a></h2>
 <p>This module contains some useful functions.</p>
-<dl class="data">
-<dt id="ntg_common.tools.BOOKS">
-<code class="sig-name descname">BOOKS</code><em class="property"> = [(1, 'Mt', 'Matthew', 28), (2, 'Mc', 'Mark', 16), (3, 'L', 'Luke', 24), (4, 'J', 'John', 21), (5, 'Acts', 'Acts', 28), (6, 'R', 'Romans', 16), (7, '1K', '1 Corinthians', 16), (8, '2K', '2 Corinthians', 13), (9, 'G', 'Galatians', 6), (10, 'E', 'Ephesians', 6), (11, 'Ph', 'Philippians', 4), (12, 'Kol', 'Colossians', 4), (13, '1Th', '1 Thessalonians', 5), (14, '2Th', '2 Thessalonians', 3), (15, '1T', '1 Timothy', 6), (16, '2T', '2 Timothy', 4), (17, 'Tt', 'Titus', 3), (18, 'Phm', 'Philemon', 1), (19, 'H', 'Hebrews', 13), (20, 'Jc', 'James', 5), (21, '1P', '1 Peter', 5), (22, '2P', '2 Peter', 3), (23, '1J', '1 John', 5), (24, '2J', '2 John', 1), (25, '3J', '3 John', 1), (26, 'Jd', 'Jude', 1), (27, 'Ap', 'Revelation', 22)]</em><a class="headerlink" href="#ntg_common.tools.BOOKS" title="Permalink to this definition">¶</a></dt>
+<dl class="py data">
+<dt class="sig sig-object py" id="ntg_common.tools.BOOKS">
+<span class="sig-name descname"><span class="pre">BOOKS</span></span><em class="property"> <span class="pre">=</span> <span class="pre">[(1,</span> <span class="pre">'Mt',</span> <span class="pre">'Matthew',</span> <span class="pre">28),</span> <span class="pre">(2,</span> <span class="pre">'Mc',</span> <span class="pre">'Mark',</span> <span class="pre">16),</span> <span class="pre">(3,</span> <span class="pre">'L',</span> <span class="pre">'Luke',</span> <span class="pre">24),</span> <span class="pre">(4,</span> <span class="pre">'J',</span> <span class="pre">'John',</span> <span class="pre">21),</span> <span class="pre">(5,</span> <span class="pre">'Acts',</span> <span class="pre">'Acts',</span> <span class="pre">28),</span> <span class="pre">(6,</span> <span class="pre">'R',</span> <span class="pre">'Romans',</span> <span class="pre">16),</span> <span class="pre">(7,</span> <span class="pre">'1K',</span> <span class="pre">'1</span> <span class="pre">Corinthians',</span> <span class="pre">16),</span> <span class="pre">(8,</span> <span class="pre">'2K',</span> <span class="pre">'2</span> <span class="pre">Corinthians',</span> <span class="pre">13),</span> <span class="pre">(9,</span> <span class="pre">'G',</span> <span class="pre">'Galatians',</span> <span class="pre">6),</span> <span class="pre">(10,</span> <span class="pre">'E',</span> <span class="pre">'Ephesians',</span> <span class="pre">6),</span> <span class="pre">(11,</span> <span class="pre">'Ph',</span> <span class="pre">'Philippians',</span> <span class="pre">4),</span> <span class="pre">(12,</span> <span class="pre">'Kol',</span> <span class="pre">'Colossians',</span> <span class="pre">4),</span> <span class="pre">(13,</span> <span class="pre">'1Th',</span> <span class="pre">'1</span> <span class="pre">Thessalonians',</span> <span class="pre">5),</span> <span class="pre">(14,</span> <span class="pre">'2Th',</span> <span class="pre">'2</span> <span class="pre">Thessalonians',</span> <span class="pre">3),</span> <span class="pre">(15,</span> <span class="pre">'1T',</span> <span class="pre">'1</span> <span class="pre">Timothy',</span> <span class="pre">6),</span> <span class="pre">(16,</span> <span class="pre">'2T',</span> <span class="pre">'2</span> <span class="pre">Timothy',</span> <span class="pre">4),</span> <span class="pre">(17,</span> <span class="pre">'Tt',</span> <span class="pre">'Titus',</span> <span class="pre">3),</span> <span class="pre">(18,</span> <span class="pre">'Phm',</span> <span class="pre">'Philemon',</span> <span class="pre">1),</span> <span class="pre">(19,</span> <span class="pre">'H',</span> <span class="pre">'Hebrews',</span> <span class="pre">13),</span> <span class="pre">(20,</span> <span class="pre">'Jc',</span> <span class="pre">'James',</span> <span class="pre">5),</span> <span class="pre">(21,</span> <span class="pre">'1P',</span> <span class="pre">'1</span> <span class="pre">Peter',</span> <span class="pre">5),</span> <span class="pre">(22,</span> <span class="pre">'2P',</span> <span class="pre">'2</span> <span class="pre">Peter',</span> <span class="pre">3),</span> <span class="pre">(23,</span> <span class="pre">'1J',</span> <span class="pre">'1</span> <span class="pre">John',</span> <span class="pre">5),</span> <span class="pre">(24,</span> <span class="pre">'2J',</span> <span class="pre">'2</span> <span class="pre">John',</span> <span class="pre">1),</span> <span class="pre">(25,</span> <span class="pre">'3J',</span> <span class="pre">'3</span> <span class="pre">John',</span> <span class="pre">1),</span> <span class="pre">(26,</span> <span class="pre">'Jd',</span> <span class="pre">'Jude',</span> <span class="pre">1),</span> <span class="pre">(27,</span> <span class="pre">'Ap',</span> <span class="pre">'Revelation',</span> <span class="pre">22),</span> <span class="pre">(210,</span> <span class="pre">'2Sam',</span> <span class="pre">'2</span> <span class="pre">Samuel',</span> <span class="pre">2)]</span></em><a class="headerlink" href="#ntg_common.tools.BOOKS" title="Permalink to this definition">¶</a></dt>
 <dd><p>Titles of the NT books</p>
 </dd></dl>
 
-<dl class="data">
-<dt id="ntg_common.tools.BYZ_HSNR_ACTS">
-<code class="sig-name descname">BYZ_HSNR_ACTS</code><em class="property"> = '(300010, 300180, 300350, 303300, 303980, 304240, 312410)'</em><a class="headerlink" href="#ntg_common.tools.BYZ_HSNR_ACTS" title="Permalink to this definition">¶</a></dt>
+<dl class="py data">
+<dt class="sig sig-object py" id="ntg_common.tools.BYZ_HSNR">
+<span class="sig-name descname"><span class="pre">BYZ_HSNR</span></span><em class="property"> <span class="pre">=</span> <span class="pre">{'2</span> <span class="pre">Samuel':</span> <span class="pre">None,</span> <span class="pre">'Acts':</span> <span class="pre">'(300010,</span> <span class="pre">300180,</span> <span class="pre">300350,</span> <span class="pre">303300,</span> <span class="pre">303980,</span> <span class="pre">304240,</span> <span class="pre">312410)',</span> <span class="pre">'CL':</span> <span class="pre">'(300010,</span> <span class="pre">300180,</span> <span class="pre">300350,</span> <span class="pre">303300,</span> <span class="pre">303980,</span> <span class="pre">304240,</span> <span class="pre">312410)',</span> <span class="pre">'John':</span> <span class="pre">'(200070,</span> <span class="pre">200280,</span> <span class="pre">200450,</span> <span class="pre">300180,</span> <span class="pre">300350,</span> <span class="pre">302260,</span> <span class="pre">313200)',</span> <span class="pre">'Mark':</span> <span class="pre">'(300030,</span> <span class="pre">300180,</span> <span class="pre">300350,</span> <span class="pre">301050,</span> <span class="pre">302610,</span> <span class="pre">303510,</span> <span class="pre">326070)'}</span></em><a class="headerlink" href="#ntg_common.tools.BYZ_HSNR" title="Permalink to this definition">¶</a></dt>
 <dd><p>Manuscripts attesting the Byzantine Text.</p>
 <p>We use these manuscripts as templates to establish the Byzantine Text according
 to our rules.</p>
 </dd></dl>
 
-<dl class="data">
-<dt id="ntg_common.tools.FEHLVERSE">
-<code class="sig-name descname">FEHLVERSE</code><em class="property"> = '\n    (\n      begadr &gt;= 20716000 and endadr &lt;= 20716999 or\n      begadr &gt;= 20944000 and endadr &lt;= 20944999 or\n      begadr &gt;= 20946000 and endadr &lt;= 20946999 or\n      begadr &gt;= 21126000 and endadr &lt;= 21126999 or\n      begadr &gt;= 21528000 and endadr &lt;= 21528999 or\n      begadr &gt;= 21609000 and endadr &lt;= 21620999 or\n      begadr &gt;= 21608068 and endadr &lt;= 21620999 or\n\n      begadr &gt;= 50837002 and endadr &lt;= 50837047 or\n      begadr &gt;= 51534002 and endadr &lt;= 51534013 or\n      begadr &gt;= 52406020 and endadr &lt;= 52408015 or\n      begadr &gt;= 52829002 and endadr &lt;= 52829025\n    )\n    '</em><a class="headerlink" href="#ntg_common.tools.FEHLVERSE" title="Permalink to this definition">¶</a></dt>
+<dl class="py data">
+<dt class="sig sig-object py" id="ntg_common.tools.FEHLVERSE">
+<span class="sig-name descname"><span class="pre">FEHLVERSE</span></span><em class="property"> <span class="pre">=</span> <span class="pre">'\n</span>&#160;&#160;&#160; <span class="pre">(\n</span>&#160;&#160;&#160;&#160;&#160; <span class="pre">begadr</span> <span class="pre">&gt;=</span> <span class="pre">20716000</span> <span class="pre">and</span> <span class="pre">endadr</span> <span class="pre">&lt;=</span> <span class="pre">20716999</span> <span class="pre">or\n</span>&#160;&#160;&#160;&#160;&#160; <span class="pre">begadr</span> <span class="pre">&gt;=</span> <span class="pre">20944000</span> <span class="pre">and</span> <span class="pre">endadr</span> <span class="pre">&lt;=</span> <span class="pre">20944999</span> <span class="pre">or\n</span>&#160;&#160;&#160;&#160;&#160; <span class="pre">begadr</span> <span class="pre">&gt;=</span> <span class="pre">20946000</span> <span class="pre">and</span> <span class="pre">endadr</span> <span class="pre">&lt;=</span> <span class="pre">20946999</span> <span class="pre">or\n</span>&#160;&#160;&#160;&#160;&#160; <span class="pre">begadr</span> <span class="pre">&gt;=</span> <span class="pre">21126000</span> <span class="pre">and</span> <span class="pre">endadr</span> <span class="pre">&lt;=</span> <span class="pre">21126999</span> <span class="pre">or\n</span>&#160;&#160;&#160;&#160;&#160; <span class="pre">begadr</span> <span class="pre">&gt;=</span> <span class="pre">21528000</span> <span class="pre">and</span> <span class="pre">endadr</span> <span class="pre">&lt;=</span> <span class="pre">21528999</span> <span class="pre">or\n</span>&#160;&#160;&#160;&#160;&#160; <span class="pre">begadr</span> <span class="pre">&gt;=</span> <span class="pre">21609000</span> <span class="pre">and</span> <span class="pre">endadr</span> <span class="pre">&lt;=</span> <span class="pre">21620999</span> <span class="pre">or\n</span>&#160;&#160;&#160;&#160;&#160; <span class="pre">begadr</span> <span class="pre">&gt;=</span> <span class="pre">21608068</span> <span class="pre">and</span> <span class="pre">endadr</span> <span class="pre">&lt;=</span> <span class="pre">21620999</span> <span class="pre">or\n\n</span>&#160;&#160;&#160;&#160;&#160; <span class="pre">begadr</span> <span class="pre">&gt;=</span> <span class="pre">50837002</span> <span class="pre">and</span> <span class="pre">endadr</span> <span class="pre">&lt;=</span> <span class="pre">50837047</span> <span class="pre">or\n</span>&#160;&#160;&#160;&#160;&#160; <span class="pre">begadr</span> <span class="pre">&gt;=</span> <span class="pre">51534002</span> <span class="pre">and</span> <span class="pre">endadr</span> <span class="pre">&lt;=</span> <span class="pre">51534013</span> <span class="pre">or\n</span>&#160;&#160;&#160;&#160;&#160; <span class="pre">begadr</span> <span class="pre">&gt;=</span> <span class="pre">52406020</span> <span class="pre">and</span> <span class="pre">endadr</span> <span class="pre">&lt;=</span> <span class="pre">52408015</span> <span class="pre">or\n</span>&#160;&#160;&#160;&#160;&#160; <span class="pre">begadr</span> <span class="pre">&gt;=</span> <span class="pre">52829002</span> <span class="pre">and</span> <span class="pre">endadr</span> <span class="pre">&lt;=</span> <span class="pre">52829025\n</span>&#160;&#160;&#160; <span class="pre">)\n</span>&#160;&#160;&#160; <span class="pre">'</span></em><a class="headerlink" href="#ntg_common.tools.FEHLVERSE" title="Permalink to this definition">¶</a></dt>
 <dd><p>Verses added in later times.</p>
 <p>These verses were added to the NT in later times. Because they are not original
 they are not included in the text of manuscript ‘A’.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="ntg_common.tools.graphviz_layout">
-<code class="sig-name descname">graphviz_layout</code><span class="sig-paren">(</span><em class="sig-param">dot</em>, <em class="sig-param">format='dot'</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.tools.graphviz_layout" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.tools.graphviz_layout">
+<span class="sig-name descname"><span class="pre">graphviz_layout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'dot'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.tools.graphviz_layout" title="Permalink to this definition">¶</a></dt>
 <dd><p>Call the GraphViz dot program to generate an image but mostly to precompute
 the graph layout.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="ntg_common.tools.log">
-<code class="sig-name descname">log</code><span class="sig-paren">(</span><em class="sig-param">level</em>, <em class="sig-param">msg</em>, <em class="sig-param">*aargs</em>, <em class="sig-param">**_kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.tools.log" title="Permalink to this definition">¶</a></dt>
+<dl class="py function">
+<dt class="sig sig-object py" id="ntg_common.tools.log">
+<span class="sig-name descname"><span class="pre">log</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">aargs</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ntg_common.tools.log" title="Permalink to this definition">¶</a></dt>
 <dd><p>Low level log function</p>
 </dd></dl>
 
@@ -436,27 +763,29 @@ the graph layout.</p>
            
           </div>
           <footer>
-  
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-      
-        <a href="database.html" class="btn btn-neutral float-left" title="Database Structure" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+        <a href="vm.html" class="btn btn-neutral float-right" title="ntg.uni-muenster.de" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="database_faq.html" class="btn btn-neutral float-left" title="Database FAQ" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2016-19 CCeH - Licensed under the GNU GPL v3 or later
+        &#169; Copyright 2016-20 CCeH - Licensed under the GNU GPL v3 or later.
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
-
         </div>
       </div>
 
@@ -464,7 +793,6 @@ the graph layout.</p>
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

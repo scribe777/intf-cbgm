@@ -1,41 +1,45 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
   <title>Scripts &mdash; NTG 0.1.1 documentation</title>
   
 
   
-  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/my_theme.css" type="text/css" />
+
   
   
 
   
-  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
-  <link rel="stylesheet" href="_static/my_theme.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Developer Manual" href="developer.html" />
@@ -73,6 +77,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -82,11 +87,10 @@
             
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#web-application">Web Application</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#preparing-the-database-for-the-cbgm">Preparing the Database for the CBGM</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#applying-the-cbgm">Applying the CBGM</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#updating-the-apparatus">Updating the Apparatus</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#links">Links</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#basic-terms-and-procedures-of-the-coherence-based-genealogical-method-cbgm">Basic Terms and Procedures of the Coherence-Based Genealogical Method (CBGM)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="intro.html#links">Links</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a><ul>
@@ -103,6 +107,7 @@
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#install">Install</a></li>
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#running-the-web-application">Running the web application</a></li>
 <li class="toctree-l3"><a class="reference internal" href="install-docker.html#running-the-cbgm">Running the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="install-docker.html#troubleshooting">Troubleshooting</a></li>
 </ul>
 </li>
 </ul>
@@ -125,54 +130,8 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="developer.html">Developer Manual</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="domain.html">Introduction to the Problem Domain (German)</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#das-neue-testament">Das Neue Testament</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#editionen">Editionen</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#die-textzeugen">Die Textzeugen</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#textformen-texttypen">Textformen (Texttypen)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#textkritik">Textkritik</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#terminologie">Terminologie</a></li>
-<li class="toctree-l3"><a class="reference internal" href="domain.html#literatur">Literatur</a></li>
-</ul>
-</li>
 <li class="toctree-l2"><a class="reference internal" href="client_dev.html">Web Client</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-app">client/app</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-apparatus">client/apparatus</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-coherence">client/coherence</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison">client/comparison</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison-details-table">client/comparison_details_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-comparison-table">client/comparison_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-chord-layout">client/d3_chord_layout</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-common">client/d3_common</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-d3-stemma-layout">client/d3_stemma_layout</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-find-relatives">client/find_relatives</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-flash-messages">client/flash_messages</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-leitzeile">client/leitzeile</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-local-stemma">client/local_stemma</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-notes">client/notes</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-notes-list">client/notes_list</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-optimal-substemma">client/optimal_substemma</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-optimal-substemma-details">client/optimal_substemma_details</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-page-header">client/page_header</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-project-list">client/project_list</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-relatives-metrics">client/relatives_metrics</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-relatives-table">client/relatives_table</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-set-cover">client/set_cover</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-table-sort-mixin">client/table_sort_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-table-toggle-mixin">client/table_toggle_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-textflow">client/textflow</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-tools">client/tools</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-autocomplete">client/widgets/autocomplete</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-button-group">client/widgets/button_group</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-card">client/widgets/card</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-card-caption">client/widgets/card_caption</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-connectivity">client/widgets/connectivity</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-context-menu">client/widgets/context_menu</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-dropdown-mixin">client/widgets/dropdown_mixin</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-labezator">client/widgets/labezator</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-navigator">client/widgets/navigator</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-range">client/widgets/range</a></li>
-<li class="toctree-l3"><a class="reference internal" href="client_dev.html#client-widgets-toolbar">client/widgets/toolbar</a></li>
+<li class="toctree-l3"><a class="reference internal" href="client_dev.html#module-client-app">Modules</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="server_dev.html">API Server</a><ul>
@@ -186,6 +145,12 @@
 <li class="toctree-l3"><a class="reference internal" href="server_dev.html#module-server.helpers">server.helpers</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="server_config.html">API Server Configuration Files</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#per-application-configuration-files">Per-Application Configuration Files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#global-configuration-file">Global Configuration File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="server_config.html#footnotes">Footnotes</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="scripts_dev.html">Scripts</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="scripts_dev.html#module-scripts.cceh.import">scripts.cceh.import</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scripts_dev.html#module-scripts.cceh.prepare">scripts.cceh.prepare</a></li>
@@ -197,13 +162,49 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="database.html">Database Structure</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="database.html#cbgm-database">CBGM Database</a></li>
-<li class="toctree-l3"><a class="reference internal" href="database.html#source-database">Source Database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#source-databases">Source Databases</a></li>
 <li class="toctree-l3"><a class="reference internal" href="database.html#literature">Literature</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="ntg_common.html">Various Functions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="database_faq.html">Database FAQ</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="database_faq.html#manual-editing-of-journalled-tables">Manual Editing of Journalled Tables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database_faq.html#apparatus-updates">Apparatus Updates</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ntg_common.html">Common Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.cbgm_common">ntg_common.cbgm_common</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.config">ntg_common.config</a></li>
 <li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.db_tools">ntg_common.db_tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.exceptions">ntg_common.exceptions</a></li>
 <li class="toctree-l3"><a class="reference internal" href="ntg_common.html#module-ntg_common.tools">ntg_common.tools</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="vm.html">ntg.uni-muenster.de</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#apache">Apache</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#api-server">API Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#postgres">Postgres</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#users">Users</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#backups">Backups</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#icinga">Icinga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="vm.html#openstack-cloud">OpenStack Cloud</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cbgm.html">CBGM</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#preparing-the-database-for-the-cbgm">Preparing the Database for the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#applying-the-cbgm">Applying the CBGM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-project">Starting a New Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-phase">Starting a New Phase</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cbgm.html#starting-a-new-phase-with-apparatus-update">Starting a New Phase With Apparatus Update</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="user_management.html">User Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="user_management.html#manual-user-management">Manual User Management</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="technologies.html">Technologies Used</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#server">Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#client">Client</a></li>
+<li class="toctree-l3"><a class="reference internal" href="technologies.html#scripts">Scripts</a></li>
 </ul>
 </li>
 </ul>
@@ -213,6 +214,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -247,11 +249,13 @@
 
 
 
+
+
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="index.html">Docs</a> &raquo;</li>
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
         
           <li><a href="user.html">User Manual</a> &raquo;</li>
         
@@ -260,7 +264,7 @@
     
       <li class="wy-breadcrumbs-aside">
         
-            
+          
             <a href="_sources/scripts_user.rst.txt" rel="nofollow"> View page source</a>
           
         
@@ -276,8 +280,18 @@
             
   <div class="section" id="scripts">
 <h1>Scripts<a class="headerlink" href="#scripts" title="Permalink to this headline">¶</a></h1>
+<div class="contents local topic" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#scripts-cceh-import-py" id="id1">scripts/cceh/import.py</a></p></li>
+<li><p><a class="reference internal" href="#scripts-cceh-prepare-py" id="id2">scripts/cceh/prepare.py</a></p></li>
+<li><p><a class="reference internal" href="#scripts-cceh-cbgm-py" id="id3">scripts/cceh/cbgm.py</a></p></li>
+<li><p><a class="reference internal" href="#scripts-cceh-save-edits-py" id="id4">scripts/cceh/save_edits.py</a></p></li>
+<li><p><a class="reference internal" href="#scripts-cceh-load-edits-py" id="id5">scripts/cceh/load_edits.py</a></p></li>
+<li><p><a class="reference internal" href="#scripts-cceh-mk-users-py" id="id6">scripts/cceh/mk_users.py</a></p></li>
+</ul>
+</div>
 <div class="section" id="scripts-cceh-import-py">
-<span id="import-py"></span><h2>scripts/cceh/import.py<a class="headerlink" href="#scripts-cceh-import-py" title="Permalink to this headline">¶</a></h2>
+<span id="import-py"></span><h2><a class="toc-backref" href="#id1">scripts/cceh/import.py</a><a class="headerlink" href="#scripts-cceh-import-py" title="Permalink to this headline">¶</a></h2>
 <p>Import databases from mysql.</p>
 <p>This script initializes the postgres database and then imports data from one or
 more mysql databases.</p>
@@ -288,39 +302,39 @@ more mysql databases.</p>
 <p>The source databases are:</p>
 <ol class="arabic simple">
 <li><p>a database containing the apparatus of the <em>Editio Critica Maior</em>
-publication (ECM).</p></li>
-<li><p>a database containing the editorial decisions regarding the priority of the
-readings (VarGen).</p></li>
-<li><p>a database containing the “Leitzeile” (Nestle).</p></li>
+publication (ECM),</p></li>
+<li><p>a database containing the <em>Leitzeile</em>, and</p></li>
+<li><p>optionally a database containing the editorial decisions regarding the
+priority of the readings (VarGen).</p></li>
 </ol>
 <p>The source tables for Acts are partitioned into 28 chapters.  This is a
 historical incident: The software used when the CBGM was first implemented could
-not handle big tables.  The import script is able to join partitioned tables.</p>
-<p>After running this script should run the <a class="reference internal" href="#prepare-py"><span class="std std-ref">scripts/cceh/prepare.py</span></a> script.</p>
+not handle big tables.  The import script joins partitioned tables into one.</p>
+<p>After running this script you should run the <a class="reference internal" href="#prepare-py"><span class="std std-ref">scripts/cceh/prepare.py</span></a> script.</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: scripts/cceh/import.py [-h] [-v] path/to/file.conf</span>
 </pre></div>
 </div>
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-import-py-arg-path">
-<code class="sig-name descname">path</code><code class="sig-prename descclassname">/to/file.conf</code><a class="headerlink" href="#cmdoption-scripts-cceh-import-py-arg-path" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-import.py-arg-path">
+<span id="cmdoption-scripts-cceh-import-py-arg-path"></span><span class="sig-name descname"><span class="pre">path</span></span><span class="sig-prename descclassname"><span class="pre">/to/file.conf</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-import.py-arg-path" title="Permalink to this definition">¶</a></dt>
 <dd><p>a .conf file (required)</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-import-py-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-import-py-h" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-import.py-h">
+<span id="cmdoption-scripts-cceh-import-py-h"></span><span id="cmdoption-scripts-cceh-import.py-help"></span><span id="cmdoption-scripts-cceh-import-py-help"></span><span class="sig-name descname"><span class="pre">-h</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--help</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-import.py-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-import-py-v">
-<code class="sig-name descname">-v</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--verbose</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-import-py-v" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-import.py-v">
+<span id="cmdoption-scripts-cceh-import-py-v"></span><span id="cmdoption-scripts-cceh-import.py-verbose"></span><span id="cmdoption-scripts-cceh-import-py-verbose"></span><span class="sig-name descname"><span class="pre">-v</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--verbose</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-import.py-v" title="Permalink to this definition">¶</a></dt>
 <dd><p>increase output verbosity</p>
 </dd></dl>
 
 </div>
 <div class="section" id="scripts-cceh-prepare-py">
-<span id="prepare-py"></span><h2>scripts/cceh/prepare.py<a class="headerlink" href="#scripts-cceh-prepare-py" title="Permalink to this headline">¶</a></h2>
+<span id="prepare-py"></span><h2><a class="toc-backref" href="#id2">scripts/cceh/prepare.py</a><a class="headerlink" href="#scripts-cceh-prepare-py" title="Permalink to this headline">¶</a></h2>
 <p>Initialize a CBGM database.</p>
 <p>This script converts the databases structure used in the production of the <em>ECM</em>
 into a database structure suitable for doing CBGM. It</p>
@@ -328,7 +342,7 @@ into a database structure suitable for doing CBGM. It</p>
 <li><p>normalizes the databases,</p></li>
 <li><p>removes manuscripts, passages and readings irrelevant to the CBGM,</p></li>
 <li><p>builds a positive apparatus from the negative apparatus,</p></li>
-<li><p>reconstructs the <a class="reference internal" href="domain.html#mt"><span class="std std-ref">Majority Text</span></a>.</p></li>
+<li><p>reconstructs the <code class="xref any docutils literal notranslate"><span class="pre">mt</span></code>.</p></li>
 </ul>
 <p>Database normalization is the usual process of restructuring your tables so they
 don’t contain redundant data.</p>
@@ -340,7 +354,7 @@ differing only by orthgographic convention.</p>
 <p>The script then <a class="reference internal" href="scripts_dev.html#transform-positive"><span class="std std-ref">transforms</span></a> the negative apparatus into a
 positive apparatus, that is, an apparatus that is defined for all manuscripts at
 all passages.</p>
-<p>Finally the script reconstructs the <a class="reference internal" href="domain.html#mt"><span class="std std-ref">Majority Text</span></a>.</p>
+<p>Finally the script reconstructs the <code class="xref any docutils literal notranslate"><span class="pre">mt</span></code>.</p>
 <p>After running this script you should run the <a class="reference internal" href="#cbgm-py"><span class="std std-ref">scripts/cceh/cbgm.py</span></a> script.</p>
 <blockquote>
 <div><p>Ausgangspunkt ist der Apparat mit allen für die Druckfassung notwendigen
@@ -361,33 +375,33 @@ für die CBGM ignoriert.</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: scripts/cceh/prepare.py [-h] [-v] [-r RANGE] path/to/file.conf</span>
 </pre></div>
 </div>
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-prepare-py-arg-path">
-<code class="sig-name descname">path</code><code class="sig-prename descclassname">/to/file.conf</code><a class="headerlink" href="#cmdoption-scripts-cceh-prepare-py-arg-path" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-prepare.py-arg-path">
+<span id="cmdoption-scripts-cceh-prepare-py-arg-path"></span><span class="sig-name descname"><span class="pre">path</span></span><span class="sig-prename descclassname"><span class="pre">/to/file.conf</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-prepare.py-arg-path" title="Permalink to this definition">¶</a></dt>
 <dd><p>a .conf file (required)</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-prepare-py-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-prepare-py-h" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-prepare.py-h">
+<span id="cmdoption-scripts-cceh-prepare-py-h"></span><span id="cmdoption-scripts-cceh-prepare.py-help"></span><span id="cmdoption-scripts-cceh-prepare-py-help"></span><span class="sig-name descname"><span class="pre">-h</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--help</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-prepare.py-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-prepare-py-v">
-<code class="sig-name descname">-v</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--verbose</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-prepare-py-v" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-prepare.py-v">
+<span id="cmdoption-scripts-cceh-prepare-py-v"></span><span id="cmdoption-scripts-cceh-prepare.py-verbose"></span><span id="cmdoption-scripts-cceh-prepare-py-verbose"></span><span class="sig-name descname"><span class="pre">-v</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--verbose</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-prepare.py-v" title="Permalink to this definition">¶</a></dt>
 <dd><p>increase output verbosity</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-prepare-py-r">
-<code class="sig-name descname">-r</code><code class="sig-prename descclassname"> &lt;range&gt;</code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--range</code><code class="sig-prename descclassname"> &lt;range&gt;</code><a class="headerlink" href="#cmdoption-scripts-cceh-prepare-py-r" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-prepare.py-r">
+<span id="cmdoption-scripts-cceh-prepare-py-r"></span><span id="cmdoption-scripts-cceh-prepare.py-range"></span><span id="cmdoption-scripts-cceh-prepare-py-range"></span><span class="sig-name descname"><span class="pre">-r</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;range&gt;</span></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--range</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;range&gt;</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-prepare.py-r" title="Permalink to this definition">¶</a></dt>
 <dd><p>range of steps (default: all)</p>
 </dd></dl>
 
 </div>
 <div class="section" id="scripts-cceh-cbgm-py">
-<span id="cbgm-py"></span><h2>scripts/cceh/cbgm.py<a class="headerlink" href="#scripts-cceh-cbgm-py" title="Permalink to this headline">¶</a></h2>
+<span id="cbgm-py"></span><h2><a class="toc-backref" href="#id3">scripts/cceh/cbgm.py</a><a class="headerlink" href="#scripts-cceh-cbgm-py" title="Permalink to this headline">¶</a></h2>
 <p>Perform the CBGM.</p>
 <p>This script</p>
 <ul class="simple">
@@ -400,27 +414,27 @@ It also updates the Apparatus table where manuscript ‘A is concerned.</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: scripts/cceh/cbgm.py [-h] [-v] path/to/file.conf</span>
 </pre></div>
 </div>
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-cbgm-py-arg-path">
-<code class="sig-name descname">path</code><code class="sig-prename descclassname">/to/file.conf</code><a class="headerlink" href="#cmdoption-scripts-cceh-cbgm-py-arg-path" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-cbgm.py-arg-path">
+<span id="cmdoption-scripts-cceh-cbgm-py-arg-path"></span><span class="sig-name descname"><span class="pre">path</span></span><span class="sig-prename descclassname"><span class="pre">/to/file.conf</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-cbgm.py-arg-path" title="Permalink to this definition">¶</a></dt>
 <dd><p>a .conf file (required)</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-cbgm-py-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-cbgm-py-h" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-cbgm.py-h">
+<span id="cmdoption-scripts-cceh-cbgm-py-h"></span><span id="cmdoption-scripts-cceh-cbgm.py-help"></span><span id="cmdoption-scripts-cceh-cbgm-py-help"></span><span class="sig-name descname"><span class="pre">-h</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--help</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-cbgm.py-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-cbgm-py-v">
-<code class="sig-name descname">-v</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--verbose</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-cbgm-py-v" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-cbgm.py-v">
+<span id="cmdoption-scripts-cceh-cbgm-py-v"></span><span id="cmdoption-scripts-cceh-cbgm.py-verbose"></span><span id="cmdoption-scripts-cceh-cbgm-py-verbose"></span><span class="sig-name descname"><span class="pre">-v</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--verbose</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-cbgm.py-v" title="Permalink to this definition">¶</a></dt>
 <dd><p>increase output verbosity</p>
 </dd></dl>
 
 </div>
 <div class="section" id="scripts-cceh-save-edits-py">
-<span id="save-edits-py"></span><h2>scripts/cceh/save_edits.py<a class="headerlink" href="#scripts-cceh-save-edits-py" title="Permalink to this headline">¶</a></h2>
+<span id="save-edits-py"></span><h2><a class="toc-backref" href="#id4">scripts/cceh/save_edits.py</a><a class="headerlink" href="#scripts-cceh-save-edits-py" title="Permalink to this headline">¶</a></h2>
 <p>Save the state of the editor tables.</p>
 <p>This script saves the tables containing the editorial decisions.  It does not
 save the apparatus tables.</p>
@@ -428,33 +442,33 @@ save the apparatus tables.</p>
 <span class="go">                                  path/to/file.conf</span>
 </pre></div>
 </div>
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-save-edits-py-arg-path">
-<code class="sig-name descname">path</code><code class="sig-prename descclassname">/to/file.conf</code><a class="headerlink" href="#cmdoption-scripts-cceh-save-edits-py-arg-path" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-save_edits.py-arg-path">
+<span id="cmdoption-scripts-cceh-save-edits-py-arg-path"></span><span class="sig-name descname"><span class="pre">path</span></span><span class="sig-prename descclassname"><span class="pre">/to/file.conf</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-save_edits.py-arg-path" title="Permalink to this definition">¶</a></dt>
 <dd><p>a .conf file (required)</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-save-edits-py-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-save-edits-py-h" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-save_edits.py-h">
+<span id="cmdoption-scripts-cceh-save-edits-py-h"></span><span id="cmdoption-scripts-cceh-save_edits.py-help"></span><span id="cmdoption-scripts-cceh-save-edits-py-help"></span><span class="sig-name descname"><span class="pre">-h</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--help</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-save_edits.py-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-save-edits-py-v">
-<code class="sig-name descname">-v</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--verbose</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-save-edits-py-v" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-save_edits.py-v">
+<span id="cmdoption-scripts-cceh-save-edits-py-v"></span><span id="cmdoption-scripts-cceh-save_edits.py-verbose"></span><span id="cmdoption-scripts-cceh-save-edits-py-verbose"></span><span class="sig-name descname"><span class="pre">-v</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--verbose</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-save_edits.py-v" title="Permalink to this definition">¶</a></dt>
 <dd><p>increase output verbosity</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-save-edits-py-o">
-<code class="sig-name descname">-o</code><code class="sig-prename descclassname"> &lt;path/to/output.xml&gt;</code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--output</code><code class="sig-prename descclassname"> &lt;path/to/output.xml&gt;</code><a class="headerlink" href="#cmdoption-scripts-cceh-save-edits-py-o" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-save_edits.py-o">
+<span id="cmdoption-scripts-cceh-save-edits-py-o"></span><span id="cmdoption-scripts-cceh-save_edits.py-output"></span><span id="cmdoption-scripts-cceh-save-edits-py-output"></span><span class="sig-name descname"><span class="pre">-o</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;path/to/output.xml&gt;</span></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--output</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;path/to/output.xml&gt;</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-save_edits.py-o" title="Permalink to this definition">¶</a></dt>
 <dd><p>the output file (required)</p>
 </dd></dl>
 
 </div>
 <div class="section" id="scripts-cceh-load-edits-py">
-<span id="load-edits-py"></span><h2>scripts/cceh/load_edits.py<a class="headerlink" href="#scripts-cceh-load-edits-py" title="Permalink to this headline">¶</a></h2>
+<span id="load-edits-py"></span><h2><a class="toc-backref" href="#id5">scripts/cceh/load_edits.py</a><a class="headerlink" href="#scripts-cceh-load-edits-py" title="Permalink to this headline">¶</a></h2>
 <p>Load a saved state of the editor tables.</p>
 <p>This script loads the state of the tables with the editorial decisions as saved
 by the save_edits.py script.  It does not touch the apparatus tables.</p>
@@ -466,71 +480,72 @@ from ‘a’.</p>
 <span class="go">                                  path/to/file.conf</span>
 </pre></div>
 </div>
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-load-edits-py-arg-path">
-<code class="sig-name descname">path</code><code class="sig-prename descclassname">/to/file.conf</code><a class="headerlink" href="#cmdoption-scripts-cceh-load-edits-py-arg-path" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-load_edits.py-arg-path">
+<span id="cmdoption-scripts-cceh-load-edits-py-arg-path"></span><span class="sig-name descname"><span class="pre">path</span></span><span class="sig-prename descclassname"><span class="pre">/to/file.conf</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-load_edits.py-arg-path" title="Permalink to this definition">¶</a></dt>
 <dd><p>a .conf file (required)</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-load-edits-py-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-load-edits-py-h" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-load_edits.py-h">
+<span id="cmdoption-scripts-cceh-load-edits-py-h"></span><span id="cmdoption-scripts-cceh-load_edits.py-help"></span><span id="cmdoption-scripts-cceh-load-edits-py-help"></span><span class="sig-name descname"><span class="pre">-h</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--help</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-load_edits.py-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-load-edits-py-v">
-<code class="sig-name descname">-v</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--verbose</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-load-edits-py-v" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-load_edits.py-v">
+<span id="cmdoption-scripts-cceh-load-edits-py-v"></span><span id="cmdoption-scripts-cceh-load_edits.py-verbose"></span><span id="cmdoption-scripts-cceh-load-edits-py-verbose"></span><span class="sig-name descname"><span class="pre">-v</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--verbose</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-load_edits.py-v" title="Permalink to this definition">¶</a></dt>
 <dd><p>increase output verbosity</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-load-edits-py-i">
-<code class="sig-name descname">-i</code><code class="sig-prename descclassname"> &lt;path/to/input.xml&gt;</code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--input</code><code class="sig-prename descclassname"> &lt;path/to/input.xml&gt;</code><a class="headerlink" href="#cmdoption-scripts-cceh-load-edits-py-i" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-load_edits.py-i">
+<span id="cmdoption-scripts-cceh-load-edits-py-i"></span><span id="cmdoption-scripts-cceh-load_edits.py-input"></span><span id="cmdoption-scripts-cceh-load-edits-py-input"></span><span class="sig-name descname"><span class="pre">-i</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;path/to/input.xml&gt;</span></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--input</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;path/to/input.xml&gt;</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-load_edits.py-i" title="Permalink to this definition">¶</a></dt>
 <dd><p>the input file (required)</p>
 </dd></dl>
 
 </div>
 <div class="section" id="scripts-cceh-mk-users-py">
-<span id="mk-users-py"></span><h2>scripts/cceh/mk_users.py<a class="headerlink" href="#scripts-cceh-mk-users-py" title="Permalink to this headline">¶</a></h2>
+<span id="mk-users-py"></span><h2><a class="toc-backref" href="#id6">scripts/cceh/mk_users.py</a><a class="headerlink" href="#scripts-cceh-mk-users-py" title="Permalink to this headline">¶</a></h2>
 <p>Initialize the database for user authentication and authorization.</p>
+<p>Creates the tables and inserts the admin user.</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usage: scripts/cceh/mk_users.py [-h] -e EMAIL [-u USERNAME] [-p PASSWORD] [-v]</span>
 <span class="go">                                path/to/_global.conf</span>
 </pre></div>
 </div>
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-mk-users-py-arg-path">
-<code class="sig-name descname">path</code><code class="sig-prename descclassname">/to/_global.conf</code><a class="headerlink" href="#cmdoption-scripts-cceh-mk-users-py-arg-path" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-mk_users.py-arg-path">
+<span id="cmdoption-scripts-cceh-mk-users-py-arg-path"></span><span class="sig-name descname"><span class="pre">path</span></span><span class="sig-prename descclassname"><span class="pre">/to/_global.conf</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-mk_users.py-arg-path" title="Permalink to this definition">¶</a></dt>
 <dd><p>path to the _global.conf file (required)</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-mk-users-py-h">
-<code class="sig-name descname">-h</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--help</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-mk-users-py-h" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-mk_users.py-h">
+<span id="cmdoption-scripts-cceh-mk-users-py-h"></span><span id="cmdoption-scripts-cceh-mk_users.py-help"></span><span id="cmdoption-scripts-cceh-mk-users-py-help"></span><span class="sig-name descname"><span class="pre">-h</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--help</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-mk_users.py-h" title="Permalink to this definition">¶</a></dt>
 <dd><p>show this help message and exit</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-mk-users-py-e">
-<code class="sig-name descname">-e</code><code class="sig-prename descclassname"> &lt;email&gt;</code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--email</code><code class="sig-prename descclassname"> &lt;email&gt;</code><a class="headerlink" href="#cmdoption-scripts-cceh-mk-users-py-e" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-mk_users.py-e">
+<span id="cmdoption-scripts-cceh-mk-users-py-e"></span><span id="cmdoption-scripts-cceh-mk_users.py-email"></span><span id="cmdoption-scripts-cceh-mk-users-py-email"></span><span class="sig-name descname"><span class="pre">-e</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;email&gt;</span></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--email</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;email&gt;</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-mk_users.py-e" title="Permalink to this definition">¶</a></dt>
 <dd><p>email</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-mk-users-py-u">
-<code class="sig-name descname">-u</code><code class="sig-prename descclassname"> &lt;username&gt;</code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--username</code><code class="sig-prename descclassname"> &lt;username&gt;</code><a class="headerlink" href="#cmdoption-scripts-cceh-mk-users-py-u" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-mk_users.py-u">
+<span id="cmdoption-scripts-cceh-mk-users-py-u"></span><span id="cmdoption-scripts-cceh-mk_users.py-username"></span><span id="cmdoption-scripts-cceh-mk-users-py-username"></span><span class="sig-name descname"><span class="pre">-u</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;username&gt;</span></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--username</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;username&gt;</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-mk_users.py-u" title="Permalink to this definition">¶</a></dt>
 <dd><p>username</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-mk-users-py-p">
-<code class="sig-name descname">-p</code><code class="sig-prename descclassname"> &lt;password&gt;</code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--password</code><code class="sig-prename descclassname"> &lt;password&gt;</code><a class="headerlink" href="#cmdoption-scripts-cceh-mk-users-py-p" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-mk_users.py-p">
+<span id="cmdoption-scripts-cceh-mk-users-py-p"></span><span id="cmdoption-scripts-cceh-mk_users.py-password"></span><span id="cmdoption-scripts-cceh-mk-users-py-password"></span><span class="sig-name descname"><span class="pre">-p</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;password&gt;</span></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--password</span></span><span class="sig-prename descclassname"> <span class="pre">&lt;password&gt;</span></span><a class="headerlink" href="#cmdoption-scripts-cceh-mk_users.py-p" title="Permalink to this definition">¶</a></dt>
 <dd><p>password</p>
 </dd></dl>
 
-<dl class="option">
-<dt id="cmdoption-scripts-cceh-mk-users-py-v">
-<code class="sig-name descname">-v</code><code class="sig-prename descclassname"></code><code class="sig-prename descclassname">, </code><code class="sig-name descname">--verbose</code><code class="sig-prename descclassname"></code><a class="headerlink" href="#cmdoption-scripts-cceh-mk-users-py-v" title="Permalink to this definition">¶</a></dt>
+<dl class="std option">
+<dt class="sig sig-object std" id="cmdoption-scripts-cceh-mk_users.py-v">
+<span id="cmdoption-scripts-cceh-mk-users-py-v"></span><span id="cmdoption-scripts-cceh-mk_users.py-verbose"></span><span id="cmdoption-scripts-cceh-mk-users-py-verbose"></span><span class="sig-name descname"><span class="pre">-v</span></span><span class="sig-prename descclassname"></span><span class="sig-prename descclassname"><span class="pre">,</span> </span><span class="sig-name descname"><span class="pre">--verbose</span></span><span class="sig-prename descclassname"></span><a class="headerlink" href="#cmdoption-scripts-cceh-mk_users.py-v" title="Permalink to this definition">¶</a></dt>
 <dd><p>increase output verbosity</p>
 </dd></dl>
 
@@ -542,29 +557,29 @@ from ‘a’.</p>
            
           </div>
           <footer>
-  
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="developer.html" class="btn btn-neutral float-right" title="Developer Manual" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="server_user.html" class="btn btn-neutral float-left" title="Server" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+        <a href="developer.html" class="btn btn-neutral float-right" title="Developer Manual" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="server_user.html" class="btn btn-neutral float-left" title="Server" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2016-19 CCeH - Licensed under the GNU GPL v3 or later
+        &#169; Copyright 2016-20 CCeH - Licensed under the GNU GPL v3 or later.
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
-
         </div>
       </div>
 
@@ -572,7 +587,6 @@ from ‘a’.</p>
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {

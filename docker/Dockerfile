@@ -1,4 +1,4 @@
-FROM python:3.7-slim-buster
+FROM python:3.8-slim-buster
 
 RUN	apt-get update && \
     apt-get install -y --no-install-recommends graphviz gosu && \
@@ -7,9 +7,6 @@ RUN	apt-get update && \
 
 COPY server/requirements.txt /tmp/
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
-# workaround: pip won't install those packages
-RUN pip install email_validator
-RUN pip install login
 
 RUN useradd --create-home ntg
 WORKDIR /home/ntg
@@ -20,12 +17,14 @@ RUN chown ntg:ntg .pgpass && chmod 600 .pgpass
 
 COPY server                 /home/ntg/server
 COPY ntg_common             /home/ntg/ntg_common
-COPY *.conf                 /home/ntg/instance/
+COPY instance/*.conf        /home/ntg/instance/
 COPY client                 /home/ntg/client
-COPY api.conf.js            /home/ntg/client
 COPY scripts/*.py           /home/ntg/scripts/
 
 COPY docker-entrypoint.sh   /usr/local/bin/
+RUN chown ntg:ntg /usr/local/bin/docker-entrypoint.sh
+RUN chown ntg:ntg -R /home/ntg/client
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 5000
 
@@ -35,3 +34,5 @@ USER ntg
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["app-server"]
+
+# ENTRYPOINT ["tail", "-f", "/dev/null"] # for debugging
