@@ -28,11 +28,11 @@
             >{{ link.desc }}</b-dropdown-item
           >
         </b-nav-item-dropdown>
-        <b-nav-item v-if="this.is_logged_in === false" style="position: absolute; right:0;" href="/user/sign-in"
+        <b-nav-item v-if="this.is_logged_in === false" style="position: absolute; right:0;" :href="ntvmr_login_url"
           >Log In</b-nav-item
         >
-        <b-nav-item v-if="this.is_logged_in === true" style="position: absolute; right:0;" href="/user/sign-out"
-          >Log Out</b-nav-item
+        <b-nav-item v-if="this.is_logged_in === true" style="position: absolute; right:0;" href="#" @click.prevent="ntvmr_logout"
+          >Log Out ({{ current_user.username }})</b-nav-item
         >
       </b-navbar-nav>
     </b-navbar>
@@ -117,6 +117,23 @@ export default {
         navlist.push(obj);
       }
       return navlist;
+    },
+    ntvmr_login_url: function() {
+      // Send the user to the NTVMR, which (because it holds their session
+      // cookie) redirects back here with ?vmrcreSession=<hash>.  app.vue
+      // captures that into the ntvmrSession cookie.  See vmrcre/README.md.
+      const base = window.ntvmr_api_url || "";
+      const here = window.location.origin + window.location.pathname;
+      return base + "auth/session/check/?r=" + encodeURIComponent(here);
+    }
+  },
+  methods: {
+    ntvmr_logout: function() {
+      // Clear our copy of the NTVMR session; this ends the CBGM session view
+      // without logging the user out of the NTVMR itself.
+      document.cookie =
+        "ntvmrSession=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      window.location.reload();
     }
   }
 };

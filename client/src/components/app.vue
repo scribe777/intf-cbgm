@@ -380,6 +380,25 @@ export default {
   },
   created() {
     const vm = this;
+    // NTVMR single sign-on: if we just returned from the NTVMR login redirect
+    // (auth/session/check?r=...), it appended ?vmrcreSession=<hash>.  Capture
+    // it into a cookie on this origin so the server's request_loader can use
+    // it, then drop it from the URL.  See vmrcre/README.md.
+    const params = new URLSearchParams(window.location.search);
+    const sess = params.get("vmrcreSession");
+    if (sess !== null) {
+      if (sess && sess !== "null") {
+        document.cookie =
+          "ntvmrSession=" + encodeURIComponent(sess) + "; path=/; SameSite=Lax";
+      }
+      params.delete("vmrcreSession");
+      const qs = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        window.location.pathname + (qs ? "?" + qs : "") + window.location.hash
+      );
+    }
     const requests = [
       axios.get(url.resolve(vm.api_base_url, "info.json")),
       axios.get(url.resolve(vm.api_base_url, "user.json"))
