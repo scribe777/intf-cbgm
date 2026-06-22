@@ -144,6 +144,10 @@ def context_word_range(context_description):
     return start, end
 
 
+# Labels are kept verbatim (the labez columns are widened at provisioning time;
+# see widen_labez_columns / vmrcre/README.md).
+
+
 # --------------------------------------------------------------------------- #
 # Importer
 # --------------------------------------------------------------------------- #
@@ -164,6 +168,59 @@ class Importer:
         return cur
 
     # -- reference rows ---------------------------------------------------- #
+
+    def widen_labez_columns(self, width=64):
+        """Widen labez/source_labez so full reading labels fit.
+
+        The deployed schema types labez as varchar(3), but some projects use
+        longer labels (e.g. sub-reading labels like 'aFML').  Views depend on
+        these columns, so we capture every ntg view, drop them, widen the
+        columns, and recreate the views (retry loop resolves interdependencies).
+        Idempotent; a no-op once the columns are already wide.
+        """
+
+        cur = self.execute(
+            "SELECT count(*) FROM information_schema.columns"
+            " WHERE table_schema='ntg' AND column_name IN ('labez','source_labez')"
+            "   AND data_type='character varying' AND character_maximum_length < %s",
+            (width,))
+        if cur.fetchone()[0] == 0:
+            return
+        log.info("Widening labez/source_labez columns to varchar(%d)", width)
+
+        cur = self.execute(
+            "SELECT table_name, pg_get_viewdef(('ntg.' || table_name)::regclass, true)"
+            " FROM information_schema.views WHERE table_schema='ntg'")
+        views = cur.fetchall()
+        for name, _ in views:
+            self.execute('DROP VIEW IF EXISTS ntg."%s" CASCADE' % name)
+
+        cur = self.execute(
+            "SELECT table_name, column_name FROM information_schema.columns"
+            " WHERE table_schema='ntg' AND column_name IN ('labez','source_labez')"
+            "   AND data_type='character varying' AND character_maximum_length < %s",
+            (width,))
+        for tname, cname in cur.fetchall():
+            self.execute('ALTER TABLE ntg."%s" ALTER COLUMN "%s" TYPE varchar(%d)'
+                         % (tname, cname, width))
+
+        pending = list(views)
+        while pending:
+            still, progressed = [], False
+            for name, defn in pending:
+                self.execute('SAVEPOINT sp')
+                try:
+                    self.execute('CREATE VIEW ntg."%s" AS %s' % (name, defn))
+                    self.execute('RELEASE SAVEPOINT sp')
+                    progressed = True
+                except psycopg2.Error:
+                    self.execute('ROLLBACK TO SAVEPOINT sp')
+                    still.append((name, defn))
+            pending = still
+            if not progressed:
+                raise RuntimeError('cannot recreate views: %s' %
+                                   [n for n, _ in pending])
+        self.conn.commit()
 
     def ensure_base_manuscripts(self):
         """Seed the synthetic witnesses A (the initial text) and MT."""
@@ -264,13 +321,12 @@ class Importer:
         """Import one verse's apparatus.  Returns (segments, witnesses)."""
 
         book, chapter, verse = book_chapter_verse(verse_hash)
-        osis_book = osis_ref.split('.')[0]
-        self.ensure_book(book, osis_book)
         base = verse_base_address(book, chapter, verse)
 
         root = fetch_apparatus(self.api_url, osis_ref, self.segment_group_id)
         n_seg = 0
         n_wit = 0
+        seen_passages = set()
 
         for segment in root.iter('segment'):
             cd = segment.find('contextDescription')
@@ -279,20 +335,32 @@ class Importer:
             word_start, word_end = context_word_range(cd.text)
             begadr = base + word_start
             endadr = base + word_end
+            if (begadr, endadr) in seen_passages:
+                continue        # same address from another group; process once
+            seen_passages.add((begadr, endadr))
 
             self.clear_passage(begadr, endadr)
             pass_id = self.upsert_passage(book, begadr, endadr)
             n_seg += 1
+            placed = set()        # ms_ids already given a reading at this passage
+            seen_labez = set()    # labez already created (sub-readings fold in)
 
             for reading in segment.iter('segmentReading'):
-                labez = reading.get('label')
-                lesart = reading.get('reading')
-                if labez == 'zz':       # lacuna: no substrate text
-                    lesart = None
-                self.insert_reading(pass_id, labez, lesart)
-                self.insert_default_clique_and_locstem(pass_id, labez)
+                labez = reading.get('label') or ''
+                if labez not in seen_labez:
+                    lesart = reading.get('reading')
+                    if labez == 'zz':   # lacuna: no substrate text
+                        lesart = None
+                    self.insert_reading(pass_id, labez, lesart)
+                    self.insert_default_clique_and_locstem(pass_id, labez)
+                    seen_labez.add(labez)
 
                 for witness in reading.iter('witness'):
+                    # CBGM eligibility: only the original scribe (firsthand).
+                    # Correctors (hand C/C1/...) collapse to the same hsnr and
+                    # would violate one-reading-per-ms-per-passage.
+                    if witness.get('hand'):
+                        continue
                     try:
                         doc_id = int(witness.get('docID'))
                     except (TypeError, ValueError):
@@ -306,8 +374,8 @@ class Importer:
                         hs += 's'
                     self.ensure_manuscript(hsnr, hs)
                     ms_id = self.ms_id_for(hsnr)
-                    if ms_id is None:
-                        continue
+                    if ms_id is None or ms_id in placed:
+                        continue        # one cbgm reading per ms per passage
                     labezsuf = ''
                     if witness.get('nonsense') == 'true':
                         labezsuf = 'f'
@@ -316,15 +384,25 @@ class Importer:
                     tr = witness.find('transcription')
                     lesart = tr.text if tr is not None else None
                     self.insert_witness(ms_id, pass_id, labez, labezsuf, lesart)
+                    placed.add(ms_id)
                     n_wit += 1
 
         self.conn.commit()
         return n_seg, n_wit
 
     def import_project(self, object_part):
+        self.widen_labez_columns()
         self.ensure_base_manuscripts()
-        self.conn.commit()
         verses = enumerate_verses(self.api_url, object_part)
+        # Pre-create the books up front and commit, so a single verse's
+        # rollback can't remove a book row a later verse's passage needs.
+        books = {}
+        for osis_ref, verse_hash in verses:
+            book = book_chapter_verse(verse_hash)[0]
+            books.setdefault(book, osis_ref.split('.')[0])
+        for book, osis_book in books.items():
+            self.ensure_book(book, osis_book)
+        self.conn.commit()
         log.info("Importing %d verses for '%s'", len(verses), object_part)
         total_seg = total_wit = 0
         for i, (osis_ref, verse_hash) in enumerate(verses, 1):
