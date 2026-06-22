@@ -37,46 +37,34 @@
       </div>
     </div>
     <div class="container bs-docs-container">
-      <h4>Currently online projects</h4>
+      <h4>Your projects</h4>
       <br />
-      <table class="table table-bordered table-hover">
+      <p v-if="!is_logged_in">
+        <a :href="ntvmr_login_url">Log in</a> to see the projects you can work
+        on.
+      </p>
+      <p v-else-if="projects_loaded && projects.length === 0">
+        You are not a member of any projects yet.
+      </p>
+      <table
+        v-else-if="projects.length"
+        class="table table-bordered table-hover"
+      >
         <tbody>
           <tr>
             <th></th>
             <th>Project</th>
-            <th>Editable</th>
-            <th>Description</th>
-            <th>Guide</th>
+            <th>Book</th>
+            <th>User group</th>
           </tr>
-          <router-link
-            v-for="i of $store.state.instances"
-            :key="i.application_root"
-            tag="tr"
-            :to="'/' + i.application_root"
-          >
-          <td style="width:50px; text-align:center;"><i class="fas fa-folder-open" style="font-size: 20px;"></i></td>
-            <td class="app_name">
-              <a>{{ i.application_name }}</a>
+          <tr v-for="p of projects" :key="p.project_id">
+            <td style="width:50px; text-align:center;">
+              <i class="fas fa-folder-open" style="font-size: 20px;"></i>
             </td>
-            <td class="can_edit" style="text-align:center;">
-              <span v-if="i.user_can_write" class="fas fa-pen-square" style="color: #41799e;"/>
-            </td>
-            <td class="app_desc">
-              {{ i.application_description }}
-            </td>
-            <td class="guide">
-              <div v-if="i.application_name.includes('Acts')">
-                <a href="/pdfs/GenQ4_Guide.pdf" target="_blank"
-                  >Short Guide (PDF) for Acts</a
-                >
-              </div>
-              <div v-if="i.application_name.includes('Mark')">
-                <a href="/pdfs/Short_Guide_CBGM_Mark_KW.pdf" target="_blank"
-                  >Short Guide (PDF) for Mark</a
-                >
-              </div>
-            </td>
-          </router-link>
+            <td class="app_name">{{ p.name }}</td>
+            <td>{{ p.object_part }}</td>
+            <td>{{ p.user_group }}</td>
+          </tr>
         </tbody>
       </table>
 
@@ -210,21 +198,52 @@
  * @component client/project_list
  * @author Marcello Perathoner
  */
-/* import these images for the side-effect only: make webpack pack these files. */
+import { mapGetters } from "vuex";
+import axios from "axios";
+import url from "url";
 
-import actsguide from "../images/actsguide.jpg";
-import markguide from "../images/markguide.jpg";
 import ECMActs from "../images/ECMActs.jpg";
 import Docker from "../images/docker.png";
 
 export default {
   data: function() {
     return {
-      markguide: markguide,
-      actsguide: actsguide,
       ECMActs: ECMActs,
-      Docker: Docker
+      Docker: Docker,
+      projects: [],
+      projects_loaded: false
     };
+  },
+  computed: {
+    ...mapGetters(["is_logged_in"]),
+    ntvmr_login_url: function() {
+      const api = window.ntvmr_api_url || "";
+      let origin = "";
+      try {
+        origin = new URL(api).origin;
+      } catch (e) {
+        /* no NTVMR configured */
+      }
+      const here = window.location.origin + window.location.pathname;
+      const session_check =
+        api + "auth/session/check/?r=" + encodeURIComponent(here);
+      return (
+        origin + "/c/portal/login?redirect=" + encodeURIComponent(session_check)
+      );
+    }
+  },
+  created: function() {
+    const vm = this;
+    // The user's NTVMR projects (server proxies project membership for us).
+    axios
+      .get(url.resolve(window.api_base_url, "projects.json"))
+      .then(function(r) {
+        vm.projects = r.data.data.projects || [];
+        vm.projects_loaded = true;
+      })
+      .catch(function() {
+        vm.projects_loaded = true;
+      });
   }
 };
 </script>

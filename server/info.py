@@ -9,7 +9,7 @@ from flask import current_app
 import flask_login
 
 from helpers import make_json_response
-from login import user_can_read, user_can_write
+from login import user_can_read, user_can_write, ntvmr_service_request
 
 bp = flask.Blueprint('info', __name__)
 
@@ -37,6 +37,43 @@ def user_json():
         'username': user.username if logged_in else 'anonymous',
         'roles': roles,
         'can_login': current_app.config['AFTER_LOGIN_URL'] is not None
+    })
+
+
+@bp.route('/projects.json')
+def projects_json():
+    """Endpoint.  The NTVMR editorial projects belonging to the current user.
+
+    Proxies the NTVMR projectmanagement/project/list (server-side, with the
+    user's session) so the client gets the list same-origin.  See
+    vmrcre/README.md.
+    """
+
+    user = flask_login.current_user
+    projects = []
+    if user.is_authenticated and getattr(user, 'api_key', None):
+        # A user's projects come from the usergroups they belong to; each
+        # usergroup carries its project.
+        root = ntvmr_service_request(
+            'projectmanagement/usergroup/get',
+            {'userName': user.username},
+            user.api_key
+        )
+        if root is not None and root.tagName == 'userGroups':
+            for ug in root.getElementsByTagName('userGroup'):
+                for p in ug.getElementsByTagName('project'):
+                    projects.append({
+                        'project_id': p.getAttribute('projectID'),
+                        'name': p.getAttribute('name'),
+                        'object_part': p.getAttribute('objectPart'),
+                        'task_type_id': p.getAttribute('taskTypeID'),
+                        'user_group': ug.getAttribute('name'),
+                        'user_group_id': ug.getAttribute('userGroupID'),
+                    })
+
+    return make_json_response({
+        'username': user.username if user.is_authenticated else 'anonymous',
+        'projects': projects,
     })
 
 
