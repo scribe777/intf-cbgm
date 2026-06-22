@@ -378,6 +378,21 @@ export default {
   computed: {
     ...mapGetters(["api_url"])
   },
+  methods: {
+    // (Re)load instances + current user into the store.  Resolves true if a
+    // (non-anonymous) NTVMR user is logged in.
+    refresh_session() {
+      const vm = this;
+      return Promise.all([
+        axios.get(url.resolve(vm.api_base_url, "info.json")),
+        axios.get(url.resolve(vm.api_base_url, "user.json"))
+      ]).then((responses) => {
+        vm.$store.commit("instances", responses[0].data.data.instances);
+        vm.$store.commit("current_user", responses[1].data.data);
+        return responses[1].data.data.username !== "anonymous";
+      });
+    }
+  },
   created() {
     const vm = this;
     // NTVMR single sign-on: if we just returned from the NTVMR login redirect
@@ -386,7 +401,8 @@ export default {
     // it, then drop it from the URL.  See vmrcre/README.md.
     const params = new URLSearchParams(window.location.search);
     const sess = params.get("vmrcreSession");
-    if (sess !== null) {
+    const returned_from_dance = sess !== null;
+    if (returned_from_dance) {
       if (sess && sess !== "null") {
         document.cookie =
           "ntvmrSession=" + encodeURIComponent(sess) + "; path=/; SameSite=Lax";
@@ -399,14 +415,41 @@ export default {
         window.location.pathname + (qs ? "?" + qs : "") + window.location.hash
       );
     }
-    const requests = [
-      axios.get(url.resolve(vm.api_base_url, "info.json")),
-      axios.get(url.resolve(vm.api_base_url, "user.json"))
-    ];
-    Promise.all(requests).then((responses) => {
-      vm.$store.commit("instances", responses[0].data.data.instances);
-      vm.$store.commit("current_user", responses[1].data.data);
-    });
+    // Automatic single sign-on.  If we have no session yet, bounce once through
+    // the NTVMR -- a *top-level* redirect, so the browser sends the NTVMR
+    // session cookie (a hidden iframe can't: it's third-party).  If the user is
+    // logged into the NTVMR we come back with ?vmrcreSession=<hash> and are
+    // logged in; if not, we come back with none and show "Log In".  A
+    // sessionStorage guard makes this happen at most once, so logged-out users
+    // don't loop.  See vmrcre/README.md.
+    const has_cookie = document.cookie.indexOf("ntvmrSession=") !== -1;
+    let tried = false;
+    try {
+      tried = window.sessionStorage.getItem("ntvmr_sso_tried") === "1";
+    } catch (e) {
+      tried = true; // no sessionStorage -> don't risk a loop
+    }
+    if (returned_from_dance) {
+      try {
+        window.sessionStorage.setItem("ntvmr_sso_tried", "1");
+      } catch (e) {
+        /* noop */
+      }
+    }
+    if (!has_cookie && !tried && !returned_from_dance && window.ntvmr_api_url) {
+      try {
+        window.sessionStorage.setItem("ntvmr_sso_tried", "1");
+      } catch (e) {
+        /* noop */
+      }
+      const here = window.location.origin + window.location.pathname;
+      window.location.href =
+        window.ntvmr_api_url +
+        "auth/session/check/?r=" +
+        encodeURIComponent(here);
+      return; // navigating away; nothing more to do
+    }
+    vm.refresh_session();
   },
   mounted() {
     // insert css for color palettes

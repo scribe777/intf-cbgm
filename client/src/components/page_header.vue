@@ -119,12 +119,21 @@ export default {
       return navlist;
     },
     ntvmr_login_url: function() {
-      // Send the user to the NTVMR, which (because it holds their session
-      // cookie) redirects back here with ?vmrcreSession=<hash>.  app.vue
-      // captures that into the ntvmrSession cookie.  See vmrcre/README.md.
-      const base = window.ntvmr_api_url || "";
+      // Shown only when the silent SSO probe found no NTVMR session, i.e. the
+      // user is not logged into the NTVMR.  Send them to the NTVMR portal
+      // login, chained back through auth/session/check so they return here
+      // with a session.  See vmrcre/README.md.
+      const api = window.ntvmr_api_url || "";
+      let origin = "";
+      try {
+        origin = new URL(api).origin;
+      } catch (e) {
+        /* no NTVMR configured */
+      }
       const here = window.location.origin + window.location.pathname;
-      return base + "auth/session/check/?r=" + encodeURIComponent(here);
+      const session_check =
+        api + "auth/session/check/?r=" + encodeURIComponent(here);
+      return origin + "/c/portal/login?redirect=" + encodeURIComponent(session_check);
     }
   },
   methods: {
