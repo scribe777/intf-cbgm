@@ -146,10 +146,11 @@ def context_word_range(context_description):
 class Importer:
     """Writes apparatus data for one project into a CBGM database."""
 
-    def __init__(self, conn, api_url, segment_group_id):
+    def __init__(self, conn, api_url, segment_group_id, delay=0.5):
         self.conn = conn
         self.api_url = api_url
         self.segment_group_id = segment_group_id
+        self.delay = delay      # polite pause between verses (avoid fail2ban)
         self._books_seen = set()
 
     def execute(self, sql, args=None):
@@ -331,6 +332,8 @@ class Importer:
             except Exception as e:  # pylint: disable=broad-except
                 self.conn.rollback()
                 log.error("[%d/%d] %s FAILED: %s", i, len(verses), osis_ref, e)
+            if self.delay and i < len(verses):
+                time.sleep(self.delay)
         log.info("Done: %d verses, %d segments, %d witnesses",
                  len(verses), total_seg, total_wit)
         return total_seg, total_wit
@@ -347,6 +350,8 @@ def build_parser():
                    help="NTVMR API base url")
     p.add_argument('--segment-group-id', default='-1',
                    help="apparatus segmentGroupID (default -1 = all/auto)")
+    p.add_argument('--delay', type=float, default=0.5,
+                   help="seconds to pause between verses (avoid rate-limit/fail2ban)")
     p.add_argument('--dbname', default=os.environ.get('PGDATABASE'))
     p.add_argument('--host', default=os.environ.get('PGHOST', '127.0.0.1'))
     p.add_argument('--port', default=os.environ.get('PGPORT', '5432'))
@@ -368,7 +373,7 @@ def main():
         host=args.host, port=args.port, user=args.user,
         password=args.password, dbname=args.dbname)
     try:
-        Importer(conn, args.api_url, args.segment_group_id).import_project(
+        Importer(conn, args.api_url, args.segment_group_id, args.delay).import_project(
             args.object_part)
     finally:
         conn.close()
