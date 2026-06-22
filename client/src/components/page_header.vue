@@ -31,8 +31,8 @@
         <b-nav-item v-if="this.is_logged_in === false" style="position: absolute; right:0;" :href="ntvmr_login_url"
           >Log In</b-nav-item
         >
-        <b-nav-item v-if="this.is_logged_in === true" style="position: absolute; right:0;" href="#" @click.prevent="ntvmr_logout"
-          >Log Out ({{ current_user.username }})</b-nav-item
+        <b-nav-item v-if="this.is_logged_in === true" style="position: absolute; right:0;" :href="ntvmr_site_url" target="_blank" rel="noopener"
+          >{{ current_user.username }}</b-nav-item
         >
       </b-navbar-nav>
     </b-navbar>
@@ -134,15 +134,17 @@ export default {
       const session_check =
         api + "auth/session/check/?r=" + encodeURIComponent(here);
       return origin + "/c/portal/login?redirect=" + encodeURIComponent(session_check);
-    }
-  },
-  methods: {
-    ntvmr_logout: function() {
-      // Clear our copy of the NTVMR session; this ends the CBGM session view
-      // without logging the user out of the NTVMR itself.
-      document.cookie =
-        "ntvmrSession=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-      window.location.reload();
+    },
+    ntvmr_site_url: function() {
+      // The logged-in username links to the NTVMR (the identity provider),
+      // which is where a user manages or ends their session.  There is no
+      // CBGM-local logout: the session belongs to the NTVMR.
+      const api = window.ntvmr_api_url || "";
+      try {
+        return new URL(api).origin + "/";
+      } catch (e) {
+        return "/";
+      }
     }
   }
 };
