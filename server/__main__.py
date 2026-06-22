@@ -50,6 +50,7 @@ user, _role, _roles_users = login.declare_user_model_on(dba)
 db_adapter = flask_user.SQLAlchemyAdapter(dba, user)
 login_manager = flask_login.LoginManager()
 login_manager.anonymous_user = login.AnonymousUserMixin
+login.register_request_loader(login_manager)  # NTVMR single sign-on; see vmrcre/README.md
 user_manager = flask_user.UserManager(db_adapter)
 mail = flask_mail.Mail()
 
@@ -74,6 +75,11 @@ class Config ():
     WRITE_ACCESS = 'none'
     CORS_ALLOW_ORIGIN = '*'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # NTVMR single sign-on (see vmrcre/README.md).  Override per instance.
+    NTVMR_API_URL = 'https://ntvmr.uni-muenster.de/community/vmr/api/'
+    NTVMR_SESSION_COOKIE = 'ntvmrSession'
+    NTVMR_ROLE_PREFIX = 'CBGM '
+    NTVMR_PROJECT_NAME = None
 
 
 def build_parser(default_config_file=Config.CONFIG_FILE):
