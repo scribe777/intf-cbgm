@@ -283,8 +283,13 @@ def editorial_load(vref):
         return make_json_response({})
     me = _current_user_name()
     sh = getattr(flask_login.current_user, 'api_key', None)
-    who = request.values.get('userName') or me
-    fragment = get_verse(_project_id(), vref, who, sh) if sh else None
+    who = request.values.get('userName')
+    if not who and sh:
+        # No explicit editor requested: prefer my own decisions, else load
+        # whichever editor has data at this verse (collaborator's work).
+        users = list_verse_users(_project_id(), vref, sh)
+        who = me if me in users else (users[0] if users else me)
+    fragment = get_verse(_project_id(), vref, who, sh) if (sh and who) else None
     if fragment is None:
         return make_json_response({'loaded': False, 'verse': vref, 'user': who})
     uid = getattr(flask_login.current_user, 'id', 0)
@@ -342,7 +347,14 @@ def _refresh_all_worker(app, project_id, user_name, session_hash, user_id):
             conn = app.config.dba.engine.raw_connection()
             try:
                 for i, vref in enumerate(verses, 1):
-                    fragment = get_verse(project_id, vref, user_name, session_hash)
+                    # Prefer this user's own decisions at the verse; otherwise
+                    # load whichever editor has data (so collaborators' work is
+                    # included in whole-project analysis).
+                    users = list_verse_users(project_id, vref, session_hash)
+                    who = (user_name if user_name in users
+                           else (users[0] if users else None))
+                    fragment = (get_verse(project_id, vref, who, session_hash)
+                                if who else None)
                     if fragment:
                         apply_verse(conn, fragment, user_id)
                     cbgm_import._set(project_id, state='refreshing', done=i,
