@@ -351,9 +351,20 @@ export default {
             if (!active) {
               clearInterval(vm._poll);
               vm._poll = null;
+              // Reload the list so a just-finished import shows its "Open" link
+              // (its instance is now mounted).
+              vm.refresh_projects();
             }
           });
       }, 1500);
+    },
+    refresh_projects: function() {
+      const vm = this;
+      axios
+        .get(url.resolve(window.api_base_url, "projects.json"))
+        .then(function(r) {
+          vm.projects = r.data.data.projects || [];
+        });
     }
   }
 };

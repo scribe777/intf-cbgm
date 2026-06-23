@@ -139,8 +139,60 @@ def do_init_app(app):
     ))
 
 
+# Set by create_app so new instances can be built and mounted into the running
+# server at runtime (e.g. by the "Start CBGM" import).  See cbgm_import.py.
+_main_app = None
+_dispatcher = None
+_instance_path = None
+_global_config = None
+_user_db_url = None
+_config_class = None
+
+
+def build_instance_app(conf_filename):
+    """Build a sub-application for one instance/*.conf file."""
+
+    sub_app = flask.Flask(__name__)
+    sub_app.config.from_object(_config_class)
+    sub_app.config.from_pyfile(_global_config)
+    sub_app.config.from_pyfile(os.path.join(_instance_path, conf_filename))
+    sub_app.config['CONFIG_FILE'] = conf_filename
+    sub_app.config['APPLICATION_DIR'] = sub_app.config['APPLICATION_ROOT']
+    sub_app.config['APPLICATION_ROOT'] = os.path.join(
+        _main_app.config['APPLICATION_ROOT'], sub_app.config['APPLICATION_ROOT']
+    )
+    for mod in (main, textflow, comparison, editor, set_cover, checks):
+        sub_app.register_blueprint(mod.bp)
+    sub_app.config.dba = db_tools.PostgreSQLEngine(**sub_app.config)
+    sub_app.config['SQLALCHEMY_DATABASE_URI'] = _user_db_url
+    do_init_app(sub_app)
+    for mod in (main, textflow, comparison, editor, set_cover, checks):
+        mod.init_app(sub_app)
+    return sub_app
+
+
+def mount_instance(conf_filename):
+    """Build and mount an instance into the running server, no restart needed.
+
+    Called by the "Start CBGM" import once a project's database is ready, so
+    its "Open" link works immediately.
+    """
+
+    sub_app = build_instance_app(conf_filename)
+    mount = sub_app.config['APPLICATION_ROOT']
+    if _dispatcher is not None:
+        _dispatcher.mounts[mount] = sub_app   # route requests to it
+    info.init_app(_main_app, {mount: sub_app})  # so info/projects.json see it
+    _main_app.logger.info("Live-mounted instance at %s from conf %s",
+                          mount, conf_filename)
+    return mount
+
+
 def create_app(Config):
     """ App creation function """
+
+    global _main_app, _dispatcher, _instance_path, _global_config
+    global _user_db_url, _config_class
 
     instance_path = os.path.abspath('instance')
 
@@ -151,6 +203,11 @@ def create_app(Config):
     app.config.from_pyfile(global_config)
     app.config['INSTANCE_DIR'] = instance_path  # where Start CBGM writes confs
 
+    _config_class = Config
+    _main_app = app
+    _instance_path = instance_path
+    _global_config = global_config
+
     # pylint: disable=no-member
     app.logger.setLevel(Config.LOG_LEVEL)
     app.logger.info("Instance path: {ip}".format(ip=instance_path))
@@ -160,6 +217,7 @@ def create_app(Config):
 
     app.config.dba = db_tools.PostgreSQLEngine(**app.config)
     user_db_url = app.config.dba.url
+    _user_db_url = user_db_url
     # tell flask_sqlalchemy where the user authentication database is
     app.config['SQLALCHEMY_DATABASE_URI'] = user_db_url
 
@@ -175,33 +233,7 @@ def create_app(Config):
         if fn == Config.CONFIG_FILE:
             continue
 
-        sub_app = flask.Flask(__name__)
-        sub_app.config.from_object(Config)
-        sub_app.config.from_pyfile(global_config)
-        sub_app.config.from_pyfile(os.path.join(instance_path, fn))
-        sub_app.config['CONFIG_FILE'] = fn
-        sub_app.config['APPLICATION_DIR'] = sub_app.config['APPLICATION_ROOT']
-        sub_app.config['APPLICATION_ROOT'] = os.path.join(
-            app.config['APPLICATION_ROOT'], sub_app.config['APPLICATION_ROOT']
-        )
-        sub_app.register_blueprint(main.bp)
-        sub_app.register_blueprint(textflow.bp)
-        sub_app.register_blueprint(comparison.bp)
-        sub_app.register_blueprint(editor.bp)
-        sub_app.register_blueprint(set_cover.bp)
-        sub_app.register_blueprint(checks.bp)
-
-        sub_app.config.dba = db_tools.PostgreSQLEngine(**sub_app.config)
-        sub_app.config['SQLALCHEMY_DATABASE_URI'] = user_db_url
-
-        do_init_app(sub_app)
-        main.init_app(sub_app)
-        textflow.init_app(sub_app)
-        comparison.init_app(sub_app)
-        editor.init_app(sub_app)
-        set_cover.init_app(sub_app)
-        checks.init_app(sub_app)
-
+        sub_app = build_instance_app(fn)
         instances[sub_app.config['APPLICATION_ROOT']] = sub_app
 
     info_app = flask.Flask(__name__)
@@ -214,6 +246,7 @@ def create_app(Config):
     instances[app.config['APPLICATION_ROOT']] = info_app
 
     d = DispatcherMiddleware(app, instances)
+    _dispatcher = d
     d.config = app.config
     d.config['EXTRA_FILES'] = extra_files
     return d

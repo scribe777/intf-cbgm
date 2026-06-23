@@ -153,7 +153,16 @@ def _worker(app, pid, object_part, name):
             importer.import_project(object_part, progress=progress)
             conn.close()
 
-            _write_instance_conf(cfg, pid, name, dbname, object_part)
+            conf_path = _write_instance_conf(cfg, pid, name, dbname, object_part)
+            # Mount the new instance into the running server so "Open" works
+            # immediately (no restart).  Best-effort: if it fails the instance
+            # still appears on the next app start.
+            try:
+                import __main__ as server_main
+                if hasattr(server_main, 'mount_instance'):
+                    server_main.mount_instance(os.path.basename(conf_path))
+            except Exception:  # pylint: disable=broad-except
+                log.exception('live mount failed; instance will appear on restart')
             _set(pid, state='done', message='done',
                  app_root=app_root_for(pid))
             log.info('Start CBGM finished for project %s (%s)', pid, name)
