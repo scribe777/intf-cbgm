@@ -275,6 +275,29 @@ def editorial_users(vref):
                                'mine': me in users})
 
 
+@bp.route('/editorial/users_by_passage.json/<int:pass_id>')
+def editorial_users_by_passage(pass_id):
+    """Like editorial_users, but keyed by passage id (what the client knows).
+
+    Resolves the passage's verse, then reports which editors have decisions
+    saved there.  Drives the "other editors have decisions here" indicator.
+    """
+
+    me = _current_user_name()
+    sh = getattr(flask_login.current_user, 'api_key', None)
+    conn = current_app.config.dba.engine.raw_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT begadr FROM passages WHERE pass_id = %s", (pass_id,))
+        row = cur.fetchone()
+    finally:
+        conn.close()
+    vref = verse_ref(row[0]) if row else None
+    users = list_verse_users(_project_id(), vref, sh) if (sh and vref) else []
+    return make_json_response({'verse': vref, 'pass_id': pass_id,
+                               'users': users, 'me': me, 'mine': me in users})
+
+
 @bp.route('/editorial/load.json/<path:vref>', methods=['POST', 'OPTIONS'])
 def editorial_load(vref):
     """Load a verse's decisions (own by default, or ?userName=) into the DB."""
