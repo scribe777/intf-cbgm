@@ -101,7 +101,8 @@ class Config ():
     # Per-project role required to SAVE editorial decisions to the NTVMR (where
     # other editors see them).  Checked with auth/hasrole scoped to the project
     # (a global role does NOT satisfy it).  Empty disables the gate.
-    CBGM_SAVE_ROLE = os.environ.get('CBGM_SAVE_ROLE', 'CBGM Editor')
+    # NTVMR project-scoped roles are 'Project '-prefixed by convention.
+    CBGM_SAVE_ROLE = os.environ.get('CBGM_SAVE_ROLE', 'Project CBGM Editor')
     # Where Start CBGM writes per-project instance confs.  Keep this OUT of the
     # baked instance/ dir so it can be a persistent volume without hiding
     # _global.conf.
