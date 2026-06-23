@@ -56,6 +56,7 @@
             <th>Project</th>
             <th>Book</th>
             <th>User group</th>
+            <th>CBGM</th>
           </tr>
           <tr v-for="p of projects" :key="p.project_id">
             <td style="width:50px; text-align:center;">
@@ -64,6 +65,42 @@
             <td class="app_name">{{ p.name }}</td>
             <td>{{ p.object_part }}</td>
             <td>{{ p.user_group }}</td>
+            <td class="cbgm-action" style="min-width: 220px;">
+              <a
+                v-if="p.instance_root"
+                class="btn btn-sm btn-success"
+                :href="'/' + p.instance_root"
+                >Open</a
+              >
+              <span
+                v-else-if="importing(p)"
+                class="import-progress"
+              >
+                <span class="bar">
+                  <span
+                    class="fill"
+                    :style="{ width: percent(p) + '%' }"
+                  ></span>
+                </span>
+                {{ p.import.message }}
+                <template v-if="p.import.total"
+                  >({{ p.import.done }}/{{ p.import.total }})</template
+                >
+              </span>
+              <span v-else-if="done(p)">
+                Imported &mdash; reload the app to open
+              </span>
+              <span v-else-if="errored(p)" class="text-danger">
+                Error: {{ p.import.message }}
+              </span>
+              <button
+                v-else
+                class="btn btn-sm btn-primary"
+                @click="startCbgm(p)"
+              >
+                Start CBGM
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -240,10 +277,84 @@ export default {
       .then(function(r) {
         vm.projects = r.data.data.projects || [];
         vm.projects_loaded = true;
+        // If an import is already running (e.g. after a page reload), resume
+        // polling so its progress keeps updating.
+        if (vm.projects.some(vm.importing)) vm.ensure_polling();
       })
       .catch(function() {
         vm.projects_loaded = true;
       });
+  },
+  beforeDestroy: function() {
+    if (this._poll) clearInterval(this._poll);
+  },
+  methods: {
+    importing: function(p) {
+      return (
+        p.import &&
+        (p.import.state === "provisioning" || p.import.state === "importing")
+      );
+    },
+    done: function(p) {
+      return p.import && p.import.state === "done";
+    },
+    errored: function(p) {
+      return p.import && p.import.state === "error";
+    },
+    percent: function(p) {
+      if (!p.import || !p.import.total) return 0;
+      return Math.round((100 * p.import.done) / p.import.total);
+    },
+    startCbgm: function(p) {
+      const vm = this;
+      const data = new URLSearchParams();
+      data.append("object_part", p.object_part);
+      data.append("name", p.name);
+      vm.$set(p, "import", {
+        state: "provisioning",
+        message: "queued",
+        done: 0,
+        total: 0
+      });
+      axios
+        .post(
+          url.resolve(
+            window.api_base_url,
+            "projects/" + p.project_id + "/start.json"
+          ),
+          data
+        )
+        .then(function() {
+          vm.ensure_polling();
+        })
+        .catch(function(e) {
+          vm.$set(p, "import", {
+            state: "error",
+            message: (e.response && e.response.statusText) || "request failed"
+          });
+        });
+    },
+    ensure_polling: function() {
+      const vm = this;
+      if (vm._poll) return;
+      vm._poll = setInterval(function() {
+        axios
+          .get(url.resolve(window.api_base_url, "import_status.json"))
+          .then(function(r) {
+            const imports = r.data.data.imports || {};
+            let active = false;
+            for (const p of vm.projects) {
+              const st = imports[p.project_id];
+              if (st) vm.$set(p, "import", st);
+              if (vm.importing(p)) active = true;
+            }
+            if (!active) {
+              clearInterval(vm._poll);
+              vm._poll = null;
+            }
+          });
+      }, 1500);
+    }
   }
 };
 </script>
@@ -254,6 +365,26 @@ export default {
 div.vm-project-list {
   .img-guide {
     height: 200px;
+  }
+
+  .import-progress {
+    font-size: 0.85em;
+    .bar {
+      display: inline-block;
+      width: 120px;
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      vertical-align: middle;
+      margin-right: 6px;
+      .fill {
+        display: block;
+        height: 100%;
+        background: #41799e;
+        transition: width 0.4s ease;
+      }
+    }
   }
 
   td.app_name {

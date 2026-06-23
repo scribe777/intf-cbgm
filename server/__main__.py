@@ -38,6 +38,7 @@ from ntg_common.exceptions import EditException
 import login
 import main
 import info
+import cbgm_import
 import static
 import textflow
 import comparison
@@ -80,6 +81,10 @@ class Config ():
     NTVMR_SESSION_COOKIE = 'ntvmrSession'
     NTVMR_ROLE_PREFIX = 'CBGM '
     NTVMR_PROJECT_NAME = None
+    # "Start CBGM" import (see vmrcre/README.md).
+    CBGM_SCHEMA_TEMPLATE_DB = 'acts_ph4'   # data-less schema is cloned from here
+    CBGM_IMPORT_DELAY = 0.5                # polite pause between verses
+    CBGM_START_ROLE = 'Editor'             # role required to start an import
 
 
 def build_parser(default_config_file=Config.CONFIG_FILE):
@@ -144,6 +149,7 @@ def create_app(Config):
     global_config = os.path.join(instance_path, Config.CONFIG_FILE)
     app.config.from_object(Config)
     app.config.from_pyfile(global_config)
+    app.config['INSTANCE_DIR'] = instance_path  # where Start CBGM writes confs
 
     # pylint: disable=no-member
     app.logger.setLevel(Config.LOG_LEVEL)
@@ -201,6 +207,7 @@ def create_app(Config):
     info_app = flask.Flask(__name__)
     info_app.config.update(app.config)
     info_app.register_blueprint(info.bp)
+    info_app.register_blueprint(cbgm_import.bp)
     do_init_app(info_app)
     info.init_app(app, instances)
 

@@ -1,7 +1,7 @@
 FROM python:3.8-slim-bullseye
 
 RUN	apt-get update && \
-    apt-get install -y --no-install-recommends graphviz gosu && \
+    apt-get install -y --no-install-recommends graphviz gosu postgresql-client && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -24,11 +24,13 @@ COPY scripts/*.py           /home/ntg/scripts/
 COPY docker-entrypoint.sh   /usr/local/bin/
 RUN chown ntg:ntg /usr/local/bin/docker-entrypoint.sh
 RUN chown ntg:ntg -R /home/ntg/client
+# "Start CBGM" writes new instance .conf files here at runtime.
+RUN chown ntg:ntg -R /home/ntg/instance
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 5000
 
-ENV PYTHONPATH /home/ntg:/home/ntg/server
+ENV PYTHONPATH /home/ntg:/home/ntg/server:/home/ntg/scripts
 
 USER ntg
 

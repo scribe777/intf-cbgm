@@ -390,7 +390,19 @@ class Importer:
         self.conn.commit()
         return n_seg, n_wit
 
-    def import_project(self, object_part):
+    def import_project(self, object_part, progress=None):
+        """Import a whole project.
+
+        progress, if given, is called as progress(done, total, message) after
+        the provisioning steps and after each verse, so a caller (e.g. the
+        "Start CBGM" server endpoint) can report live status.
+        """
+
+        def report(done, total, message):
+            if progress:
+                progress(done, total, message)
+
+        report(0, 0, 'preparing database')
         self.widen_labez_columns()
         self.ensure_base_manuscripts()
         verses = enumerate_verses(self.api_url, object_part)
@@ -401,9 +413,17 @@ class Importer:
             book = book_chapter_verse(verse_hash)[0]
             books.setdefault(book, osis_ref.split('.')[0])
         for book, osis_book in books.items():
+            if book < 1:
+                # CBGM numbers the NT (1=Matthew .. 27=Revelation); OT books
+                # fall outside this and have no place in the CBGM book model.
+                raise RuntimeError(
+                    "book '%s' is not in CBGM's New Testament numbering; "
+                    "OT projects are not supported yet" % osis_book)
             self.ensure_book(book, osis_book)
         self.conn.commit()
-        log.info("Importing %d verses for '%s'", len(verses), object_part)
+        total = len(verses)
+        log.info("Importing %d verses for '%s'", total, object_part)
+        report(0, total, 'starting import')
         total_seg = total_wit = 0
         for i, (osis_ref, verse_hash) in enumerate(verses, 1):
             try:
@@ -411,14 +431,16 @@ class Importer:
                 total_seg += n_seg
                 total_wit += n_wit
                 log.info("[%d/%d] %-16s %3d segments, %5d witnesses",
-                         i, len(verses), osis_ref, n_seg, n_wit)
+                         i, total, osis_ref, n_seg, n_wit)
             except Exception as e:  # pylint: disable=broad-except
                 self.conn.rollback()
-                log.error("[%d/%d] %s FAILED: %s", i, len(verses), osis_ref, e)
-            if self.delay and i < len(verses):
+                log.error("[%d/%d] %s FAILED: %s", i, total, osis_ref, e)
+            report(i, total, osis_ref)
+            if self.delay and i < total:
                 time.sleep(self.delay)
         log.info("Done: %d verses, %d segments, %d witnesses",
-                 len(verses), total_seg, total_wit)
+                 total, total_seg, total_wit)
+        report(total, total, 'done')
         return total_seg, total_wit
 
 
