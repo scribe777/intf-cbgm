@@ -228,6 +228,19 @@ def stemma_edit (passage_or_id):
 
         # return the changed passage
         passage = Passage (conn, passage_or_id)
+        # auto-save this verse's editorial decisions to the NTVMR (debounced,
+        # per-user, per-verse).  See cbgm_backup / vmrcre/README.md.
+        try:
+            import cbgm_backup
+            user = flask_login.current_user
+            cbgm_backup.schedule_backup (
+                current_app._get_current_object (),
+                current_app.config.get ('NTVMR_PROJECT_ID'),
+                cbgm_backup.verse_base (passage.start),
+                getattr (user, 'username', None),
+                getattr (user, 'api_key', None))
+        except Exception:  # pylint: disable=broad-except
+            tools.log (logging.WARNING, 'editorial auto-save scheduling failed')
         return make_json_response (passage.to_json ())
 
     raise EditError ('Could not edit local stemma.')

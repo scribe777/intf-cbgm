@@ -39,6 +39,7 @@ import login
 import main
 import info
 import cbgm_import
+import cbgm_backup
 import static
 import textflow
 import comparison
@@ -171,6 +172,7 @@ def build_instance_app(conf_path):
     )
     for mod in (main, textflow, comparison, editor, set_cover, checks):
         sub_app.register_blueprint(mod.bp)
+    sub_app.register_blueprint(cbgm_backup.bp)  # /editorial/* (no init_app)
     sub_app.config.dba = db_tools.PostgreSQLEngine(**sub_app.config)
     sub_app.config['SQLALCHEMY_DATABASE_URI'] = _user_db_url
     do_init_app(sub_app)
