@@ -168,13 +168,18 @@ export default {
         set_passage (passage_or_id) {
             const vm = this;
 
-            const p = Promise.all ([
-                vm.get ('passage.json/' + passage_or_id),
-            ]);
-            p.then ((responses) => {
-                const passage = responses[0].data.data;
-                vm.pass_id = passage.pass_id; // Number! updates our children
-                this.$store.commit ('caption', passage.hr);
+            const p = vm.get ('passage.json/' + passage_or_id).then ((response) => {
+                const passage = response.data.data;
+                // Auto-apply this verse's saved editorial decisions (mine if I
+                // have any here, else a collaborator's) BEFORE showing the
+                // stemma, so it reflects saved work rather than the
+                // dump/import baseline. Harmless no-op when no one has data.
+                return vm.post ('editorial/autoload.json/' + passage.pass_id)
+                    .catch (() => null)
+                    .then (() => {
+                        vm.pass_id = passage.pass_id; // Number! updates children
+                        vm.$store.commit ('caption', passage.hr);
+                    });
             });
             return p;
         },

@@ -298,6 +298,44 @@ def editorial_users_by_passage(pass_id):
                                'users': users, 'me': me, 'mine': me in users})
 
 
+@bp.route('/editorial/autoload.json/<int:pass_id>', methods=['POST', 'OPTIONS'])
+def editorial_autoload(pass_id):
+    """Auto-apply this passage's saved decisions when a verse is opened.
+
+    Picks the same editor the per-verse load would (mine if I have data here,
+    else whichever collaborator does) and applies it into the local DB, so the
+    stemma reflects saved work instead of the dump/import baseline.  No-op (and
+    harmless) when nobody has data at this verse.
+    """
+
+    if request.method == 'OPTIONS':
+        return make_json_response({})
+    sh = getattr(flask_login.current_user, 'api_key', None)
+    me = _current_user_name()
+    if not sh:
+        return make_json_response({'loaded': False})
+    conn = current_app.config.dba.engine.raw_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT begadr FROM passages WHERE pass_id = %s", (pass_id,))
+        row = cur.fetchone()
+        if not row:
+            return make_json_response({'loaded': False})
+        vref = verse_ref(row[0])
+        users = list_verse_users(_project_id(), vref, sh)
+        who = me if me in users else (users[0] if users else None)
+        if not who:
+            return make_json_response({'loaded': False, 'verse': vref})
+        fragment = get_verse(_project_id(), vref, who, sh)
+        if fragment is None:
+            return make_json_response({'loaded': False, 'verse': vref})
+        uid = getattr(flask_login.current_user, 'id', 0)
+        apply_verse(conn, fragment, uid)
+    finally:
+        conn.close()
+    return make_json_response({'loaded': True, 'verse': vref, 'user': who})
+
+
 @bp.route('/editorial/load.json/<path:vref>', methods=['POST', 'OPTIONS'])
 def editorial_load(vref):
     """Load a verse's decisions (own by default, or ?userName=) into the DB."""
