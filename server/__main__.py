@@ -90,7 +90,18 @@ class Config ():
     CBGM_SCHEMA_TEMPLATE_DB = os.environ.get(
         'CBGM_SCHEMA_TEMPLATE_DB', 'cbgm_template')  # data-less schema cloned from here
     CBGM_IMPORT_DELAY = float(os.environ.get('CBGM_IMPORT_DELAY', '0.5'))
-    CBGM_START_ROLE = os.environ.get('CBGM_START_ROLE', 'Editor')
+    # Empty => any logged-in user may Start CBGM / load / reload (the laptop
+    # case; the project list already limits to the user's own projects).  Set
+    # to a role name (e.g. 'Editor') to restrict, for a shared/hosted instance.
+    CBGM_START_ROLE = os.environ.get('CBGM_START_ROLE', '')
+    # WRITE_ACCESS baked into each imported project's instance conf.  'public'
+    # lets a logged-in laptop user edit locally; set to a role for a shared
+    # instance.  (Sharing edits to the NTVMR is gated separately, below.)
+    CBGM_PROJECT_WRITE_ACCESS = os.environ.get('CBGM_PROJECT_WRITE_ACCESS', 'public')
+    # Per-project role required to SAVE editorial decisions to the NTVMR (where
+    # other editors see them).  Checked with auth/hasrole scoped to the project
+    # (a global role does NOT satisfy it).  Empty disables the gate.
+    CBGM_SAVE_ROLE = os.environ.get('CBGM_SAVE_ROLE', 'CBGM Editor')
     # Where Start CBGM writes per-project instance confs.  Keep this OUT of the
     # baked instance/ dir so it can be a persistent volume without hiding
     # _global.conf.

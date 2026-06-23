@@ -58,6 +58,22 @@ def app_root_for(pid):
     return 'proj/%s' % pid
 
 
+def _require_can_start(action):
+    """Gate provisioning ops (start/load/reload).
+
+    A logged-in user is enough on a laptop -- the project list already limits
+    to the user's own projects.  A shared deployment can set CBGM_START_ROLE to
+    a role name to restrict further.
+    """
+
+    user = flask_login.current_user
+    if not getattr(user, 'is_authenticated', False):
+        raise PrivilegeError('Please log in to %s.' % action)
+    role = current_app.config.get('CBGM_START_ROLE') or ''
+    if role and not user.has_role(role):
+        raise PrivilegeError('You need %s access to %s.' % (role, action))
+
+
 def _pg_connect(cfg, dbname, autocommit=False):
     conn = psycopg2.connect(host=cfg['PGHOST'], port=cfg.get('PGPORT', 5432),
                             user=cfg['PGUSER'], dbname=dbname, sslmode='disable')
@@ -153,7 +169,7 @@ def _write_instance_conf(cfg, pid, name, dbname, object_part):
         'BOOK="%(book)s"\n'
         'READ_ACCESS="public"\n'
         'READ_ACCESS_PRIVATE="Reviewer"\n'
-        'WRITE_ACCESS="Editor"\n'
+        'WRITE_ACCESS="%(write)s"\n'
         'NTVMR_PROJECT_ID="%(pid)s"\n'
         'NTVMR_PROJECT_NAME="%(name)s"\n\n'
         'PGHOST="%(host)s"\n'
@@ -164,6 +180,7 @@ def _write_instance_conf(cfg, pid, name, dbname, object_part):
         'name': name, 'root': app_root_for(pid), 'book': object_part,
         'pid': pid, 'host': cfg['PGHOST'], 'port': cfg.get('PGPORT', 5432),
         'user': cfg['PGUSER'], 'db': dbname,
+        'write': cfg.get('CBGM_PROJECT_WRITE_ACCESS', 'public'),
     }
     with open(path, 'w') as fp:
         fp.write(conf)
@@ -259,9 +276,7 @@ def load_dump(pid):
 
     if request.method == 'OPTIONS':
         return make_json_response({})
-    role = current_app.config.get('CBGM_START_ROLE', 'Editor')
-    if not flask_login.current_user.has_role(role):
-        raise PrivilegeError('You need CBGM %s access to load a dump.' % role)
+    _require_can_start('load a dump')
 
     st = get_status(pid)
     if st.get('state') in ('provisioning', 'importing', 'restoring'):
@@ -292,12 +307,7 @@ def start(pid):
 
     if request.method == 'OPTIONS':
         return make_json_response({})
-    # Must hold the CBGM write role (e.g. "CBGM Editor").  We check the role
-    # directly rather than via edit_auth(), whose WRITE_ACCESS is per-instance
-    # and not meaningful on the root/info app.
-    role = current_app.config.get('CBGM_START_ROLE', 'Editor')
-    if not flask_login.current_user.has_role(role):
-        raise PrivilegeError('You need CBGM %s access to start CBGM.' % role)
+    _require_can_start('start CBGM')
 
     st = get_status(pid)
     if st.get('state') in ('provisioning', 'importing'):

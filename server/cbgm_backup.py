@@ -133,6 +133,24 @@ def _project_id():
     return current_app.config.get('NTVMR_PROJECT_ID')
 
 
+def user_can_save(session_hash):
+    """Per-project permission to SAVE decisions to the NTVMR (others see them).
+
+    Checks CBGM_SAVE_ROLE within this project via auth/hasrole -- a global role
+    does NOT satisfy a project-scoped check.  Empty CBGM_SAVE_ROLE disables it.
+    """
+
+    role = current_app.config.get('CBGM_SAVE_ROLE') or ''
+    if not role:
+        return True
+    data = {'role': role}
+    project = current_app.config.get('NTVMR_PROJECT_NAME')
+    if project:
+        data['projectName'] = project
+    root = login.ntvmr_service_request('auth/hasrole', data, session_hash)
+    return root is not None and root.getAttribute('hasRole') == 'true'
+
+
 def put_verse(project_id, vref, fragment, user_name, session_hash):
     login.ntvmr_service_request(
         'projectmanagement/project/data/put',
@@ -213,6 +231,10 @@ def schedule_backup(app, project_id, vbase, user_name, session_hash, delay=8):
     def run():
         with app.app_context():
             try:
+                if not user_can_save(session_hash):
+                    log.info('skip auto-save of %s: %s lacks save permission'
+                             ' on this project', vref, user_name)
+                    return
                 conn = app.config.dba.engine.raw_connection()
                 try:
                     fragment = export_verse(conn, vbase)
@@ -284,6 +306,10 @@ def editorial_save(vref):
     sh = getattr(flask_login.current_user, 'api_key', None)
     if not (me and sh):
         return make_json_response({'saved': False, 'reason': 'not logged in'})
+    if not user_can_save(sh):
+        return make_json_response(
+            {'saved': False,
+             'reason': 'you do not have permission to save to this project'})
     # vref like '1Tim.1.5' -> we need the address; re-derive from the DB.
     conn = current_app.config.dba.engine.raw_connection()
     try:
