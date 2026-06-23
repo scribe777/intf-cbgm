@@ -456,16 +456,17 @@ def editorial_users_by_passage(pass_id):
     conn = current_app.config.dba.engine.raw_connection()
     try:
         seg = _seg_of_passage(conn, pass_id)
+        dirty = bool(seg and me and is_pending(conn, seg[0], seg[1], me))
     finally:
         conn.close()
     if not (seg and sh):
         return make_json_response({'pass_id': pass_id, 'users': [], 'me': me,
-                                   'mine': False})
+                                   'mine': False, 'dirty': dirty})
     begadr, endadr = seg
     ref = passage_ref(begadr, endadr)
     users = list_segment_users(_project_id(), ref, sh)
     return make_json_response({'pass_id': pass_id, 'verse': verse_ref(begadr),
-                               'ref': ref,
+                               'ref': ref, 'dirty': dirty,
                                'users': users, 'me': me, 'mine': me in users})
 
 

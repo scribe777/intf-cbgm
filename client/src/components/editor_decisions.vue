@@ -1,9 +1,11 @@
 <template>
-  <span v-if="others.length" class="editor-decisions">
-    <span class="badge badge-info" :title="hint">
+  <span v-if="others.length || dirty" class="editor-decisions">
+    <span v-if="dirty" class="editor-decisions-unsaved"
+          title="You have unsynced changes on this passage.">● unsaved</span>
+    <span v-if="others.length" class="badge badge-info" :title="hint">
       👥 {{ others.length }} other editor<span v-if="others.length > 1">s</span> here
     </span>
-    <span class="editor-decisions-toggle">
+    <span v-if="others.length" class="editor-decisions-toggle">
       load:
       <button v-for="u in users" :key="u"
               type="button"
@@ -41,6 +43,7 @@ export default {
             'me'     : null,
             'mine'   : false,
             'loaded' : null,   // editor whose decisions we last loaded here
+            'dirty'  : false,  // I have unsynced local edits at this passage
             'busy'   : false,
         };
     },
@@ -75,13 +78,20 @@ export default {
                     vm.users = d.users || [];
                     vm.me    = d.me;
                     vm.mine  = d.mine;
+                    vm.dirty = !!d.dirty;
                 })
-                .catch (() => { vm.users = []; });
+                .catch (() => { vm.users = []; vm.dirty = false; });
         },
         /** Load a given editor's decisions for this passage, then reload views. */
         load_user (who) {
             const vm = this;
             if (vm.busy || !vm.pass_id) {
+                return;
+            }
+            // Loading replaces the local stemma; warn if I have unsynced edits.
+            if (vm.dirty && !window.confirm (
+                'You have unsynced changes on this passage. Loading '
+                + who + '’s decisions will replace them. Continue?')) {
                 return;
             }
             vm.busy = true;
@@ -105,6 +115,11 @@ export default {
 }
 .editor-decisions .editor-decisions-toggle {
     margin-left: 0.5em;
+}
+.editor-decisions .editor-decisions-unsaved {
+    color: #b8860b;
+    font-weight: bold;
+    margin-right: 0.5em;
 }
 .editor-decisions .btn {
     margin-left: 0.25em;

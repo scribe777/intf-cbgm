@@ -10,8 +10,9 @@
            only contain absolute-positioned stuff and thus has a height of 0 -->
       <relatives :pass_id="pass_id" ref="relatives" />
 
-      <div class="btn-toolbar">
+      <div class="btn-toolbar align-items-center">
         <navigator @input="on_nav" :value="pass_id" class="mb-3" />
+        <sync-status :epoch="epoch" />
       </div>
 
       <leitzeile :pass_id="pass_id" />
@@ -118,6 +119,7 @@ import leitzeile        from 'leitzeile.vue';
 import local_stemma     from 'local_stemma.vue';
 import notes            from 'notes.vue';
 import relatives        from 'relatives.vue';
+import sync_status      from 'sync_status.vue';
 import textflow         from 'textflow.vue';
 import tools            from 'tools';
 
@@ -143,6 +145,7 @@ Vue.component ('navigator',    navigator);
 Vue.component ('notes',        notes);
 Vue.component ('range',        range);
 Vue.component ('relatives',    relatives);
+Vue.component ('sync-status',  sync_status);
 Vue.component ('textflow',     textflow);
 Vue.component ('toolbar',      toolbar);
 Vue.component ('toolbar',      toolbar);

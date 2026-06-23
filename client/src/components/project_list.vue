@@ -327,33 +327,55 @@ export default {
       e.target.value = "";
       const p = vm._dump_project;
       if (!file || !p) return;
-      const fd = new FormData();
-      fd.append("dump", file);
-      fd.append("name", p.name);
-      fd.append("object_part", p.object_part || "");
-      vm.$set(p, "import", {
-        state: "provisioning",
-        message: "uploading dump",
-        done: 0,
-        total: 0
-      });
-      axios
-        .post(
-          url.resolve(
-            window.api_base_url,
-            "projects/" + p.project_id + "/load_dump.json"
-          ),
-          fd
-        )
-        .then(function() {
-          vm.ensure_polling();
-        })
-        .catch(function(err) {
-          vm.$set(p, "import", {
-            state: "error",
-            message: (err.response && err.response.statusText) || "upload failed"
-          });
+
+      function upload(force) {
+        const fd = new FormData();
+        fd.append("dump", file);
+        fd.append("name", p.name);
+        fd.append("object_part", p.object_part || "");
+        if (force) fd.append("force", "true");
+        vm.$set(p, "import", {
+          state: "provisioning",
+          message: "uploading dump",
+          done: 0,
+          total: 0
         });
+        axios
+          .post(
+            url.resolve(
+              window.api_base_url,
+              "projects/" + p.project_id + "/load_dump.json"
+            ),
+            fd
+          )
+          .then(function(response) {
+            const d = (response.data && response.data.data) || response.data || {};
+            if (d.needs_sync) {
+              // unsynced edits would be wiped by the DB recreate
+              vm.$set(p, "import", null);
+              if (
+                window.confirm(
+                  d.pending +
+                    " unsynced edit(s) on this project will be LOST if you reload" +
+                    " from a dump.\n\nOK = discard them and reload.\nCancel = keep" +
+                    ' them (open the project and use "Sync now" first).'
+                )
+              ) {
+                upload(true);
+              }
+              return;
+            }
+            vm.ensure_polling();
+          })
+          .catch(function(err) {
+            vm.$set(p, "import", {
+              state: "error",
+              message:
+                (err.response && err.response.statusText) || "upload failed"
+            });
+          });
+      }
+      upload(false);
     },
     reload_ntvmr: function(p) {
       this.menu_open = null;
