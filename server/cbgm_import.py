@@ -106,7 +106,12 @@ def _provision(cfg, dbname):
 def _write_instance_conf(cfg, pid, name, dbname, object_part):
     """Write an instance .conf so the tool can serve the imported project."""
 
-    instance_dir = cfg.get('INSTANCE_DIR') or os.path.abspath('instance')
+    # Write to the persistable projects dir (kept separate from the baked
+    # instance/ dir so it can be a volume).  See __main__.Config.
+    instance_dir = (cfg.get('CBGM_PROJECTS_DIR')
+                    or cfg.get('INSTANCE_DIR') or os.path.abspath('instance'))
+    if not os.path.isdir(instance_dir):
+        os.makedirs(instance_dir, exist_ok=True)
     path = os.path.join(instance_dir, '%s.conf' % dbname)
     conf = (
         'APPLICATION_NAME="%(name)s"\n'
@@ -160,7 +165,7 @@ def _worker(app, pid, object_part, name):
             try:
                 import __main__ as server_main
                 if hasattr(server_main, 'mount_instance'):
-                    server_main.mount_instance(os.path.basename(conf_path))
+                    server_main.mount_instance(conf_path)
             except Exception:  # pylint: disable=broad-except
                 log.exception('live mount failed; instance will appear on restart')
             _set(pid, state='done', message='done',

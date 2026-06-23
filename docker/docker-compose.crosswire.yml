@@ -1,0 +1,38 @@
+# CBGM × NTVMR — published, data-less stack.
+#
+#   docker compose -f docker-compose.crosswire.yml up
+#   → browse http://localhost:5000, "Log In" (NTVMR), pick a project, "Start CBGM"
+#
+# Ships no apparatus data: the database image carries only an empty CBGM schema
+# template (cbgm_template).  Each project's data is imported on demand from the
+# NTVMR when a user starts CBGM on it.
+version: "3"
+
+services:
+  # Service name must stay "ntg-db-server" (the app's PGHOST / .pgpass key).
+  ntg-db-server:
+    image: crosswire/cbgm-db-server:latest
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql        # per-project databases persist here
+    environment:
+      POSTGRES_PASSWORD: topsecret
+
+  cbgm-app-server:
+    image: crosswire/cbgm-app-server:latest
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # The NTVMR this instance authenticates against and imports from.
+      NTVMR_API_URL: "https://ntvmr.uni-muenster.de/community/vmr/api/"
+      CBGM_SCHEMA_TEMPLATE_DB: "cbgm_template"
+      # CBGM_IMPORT_DELAY: "0.5"   # seconds between apparatus calls (politeness)
+    volumes:
+      - projects:/home/ntg/projects       # imported projects' instance confs persist here
+    depends_on:
+      - ntg-db-server
+
+volumes:
+  pgdata:
+  projects:

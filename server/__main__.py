@@ -77,14 +77,22 @@ class Config ():
     CORS_ALLOW_ORIGIN = '*'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     # NTVMR single sign-on (see vmrcre/README.md).  Override per instance.
-    NTVMR_API_URL = 'https://ntvmr.uni-muenster.de/community/vmr/api/'
-    NTVMR_SESSION_COOKIE = 'ntvmrSession'
-    NTVMR_ROLE_PREFIX = 'CBGM '
+    # Overridable via environment (so the published image is configured from
+    # the compose file).  See vmrcre/README.md.
+    NTVMR_API_URL = os.environ.get(
+        'NTVMR_API_URL', 'https://ntvmr.uni-muenster.de/community/vmr/api/')
+    NTVMR_SESSION_COOKIE = os.environ.get('NTVMR_SESSION_COOKIE', 'ntvmrSession')
+    NTVMR_ROLE_PREFIX = os.environ.get('NTVMR_ROLE_PREFIX', 'CBGM ')
     NTVMR_PROJECT_NAME = None
-    # "Start CBGM" import (see vmrcre/README.md).
-    CBGM_SCHEMA_TEMPLATE_DB = 'acts_ph4'   # data-less schema is cloned from here
-    CBGM_IMPORT_DELAY = 0.5                # polite pause between verses
-    CBGM_START_ROLE = 'Editor'             # role required to start an import
+    # "Start CBGM" import.
+    CBGM_SCHEMA_TEMPLATE_DB = os.environ.get(
+        'CBGM_SCHEMA_TEMPLATE_DB', 'cbgm_template')  # data-less schema cloned from here
+    CBGM_IMPORT_DELAY = float(os.environ.get('CBGM_IMPORT_DELAY', '0.5'))
+    CBGM_START_ROLE = os.environ.get('CBGM_START_ROLE', 'Editor')
+    # Where Start CBGM writes per-project instance confs.  Keep this OUT of the
+    # baked instance/ dir so it can be a persistent volume without hiding
+    # _global.conf.
+    CBGM_PROJECTS_DIR = os.environ.get('CBGM_PROJECTS_DIR', '/home/ntg/projects')
 
 
 def build_parser(default_config_file=Config.CONFIG_FILE):
@@ -149,14 +157,14 @@ _user_db_url = None
 _config_class = None
 
 
-def build_instance_app(conf_filename):
-    """Build a sub-application for one instance/*.conf file."""
+def build_instance_app(conf_path):
+    """Build a sub-application for one instance .conf file (full path)."""
 
     sub_app = flask.Flask(__name__)
     sub_app.config.from_object(_config_class)
     sub_app.config.from_pyfile(_global_config)
-    sub_app.config.from_pyfile(os.path.join(_instance_path, conf_filename))
-    sub_app.config['CONFIG_FILE'] = conf_filename
+    sub_app.config.from_pyfile(conf_path)
+    sub_app.config['CONFIG_FILE'] = os.path.basename(conf_path)
     sub_app.config['APPLICATION_DIR'] = sub_app.config['APPLICATION_ROOT']
     sub_app.config['APPLICATION_ROOT'] = os.path.join(
         _main_app.config['APPLICATION_ROOT'], sub_app.config['APPLICATION_ROOT']
@@ -171,21 +179,39 @@ def build_instance_app(conf_filename):
     return sub_app
 
 
-def mount_instance(conf_filename):
+def mount_instance(conf_path):
     """Build and mount an instance into the running server, no restart needed.
 
     Called by the "Start CBGM" import once a project's database is ready, so
     its "Open" link works immediately.
     """
 
-    sub_app = build_instance_app(conf_filename)
+    sub_app = build_instance_app(conf_path)
     mount = sub_app.config['APPLICATION_ROOT']
     if _dispatcher is not None:
         _dispatcher.mounts[mount] = sub_app   # route requests to it
     info.init_app(_main_app, {mount: sub_app})  # so info/projects.json see it
     _main_app.logger.info("Live-mounted instance at %s from conf %s",
-                          mount, conf_filename)
+                          mount, os.path.basename(conf_path))
     return mount
+
+
+def _existing_databases(app):
+    """Set of database names on the server (to skip confs whose DB is absent)."""
+
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host=app.config['PGHOST'], port=app.config.get('PGPORT', 5432),
+            user=app.config['PGUSER'], dbname=app.config['PGDATABASE'],
+            sslmode='disable')
+        cur = conn.cursor()
+        cur.execute("SELECT datname FROM pg_database")
+        names = {r[0] for r in cur.fetchall()}
+        conn.close()
+        return names
+    except Exception:  # pylint: disable=broad-except
+        return None  # unknown -> don't skip anything
 
 
 def create_app(Config):
@@ -225,15 +251,33 @@ def create_app(Config):
     do_init_app(app)
 
     instances = collections.OrderedDict()
-    extra_files = [instance_path + '/' + Config.CONFIG_FILE]
+    extra_files = [global_config]
 
-    for fn in glob.glob(instance_path + '/*.conf'):
-        extra_files.append(fn)
-        fn = os.path.basename(fn)
-        if fn == Config.CONFIG_FILE:
+    existing_dbs = _existing_databases(app)
+
+    # Base instance confs (baked) plus per-project confs written by Start CBGM
+    # (in a separate, persistable dir).
+    projects_dir = app.config.get('CBGM_PROJECTS_DIR')
+    conf_paths = sorted(glob.glob(instance_path + '/*.conf'))
+    if projects_dir and os.path.isdir(projects_dir):
+        conf_paths += sorted(glob.glob(projects_dir + '/*.conf'))
+
+    for path in conf_paths:
+        if os.path.basename(path) == Config.CONFIG_FILE:
             continue
-
-        sub_app = build_instance_app(fn)
+        extra_files.append(path)
+        # Skip an instance whose database isn't present (e.g. the sample
+        # acts/mark confs in a data-less deployment) BEFORE building it --
+        # building eagerly connects, which would crash on a missing DB.
+        if existing_dbs is not None:
+            peek = flask.Config(instance_path)
+            peek.from_pyfile(global_config)
+            peek.from_pyfile(path)
+            if peek.get('PGDATABASE') not in existing_dbs:
+                app.logger.info("Skipping instance %s: database '%s' not found",
+                                os.path.basename(path), peek.get('PGDATABASE'))
+                continue
+        sub_app = build_instance_app(path)
         instances[sub_app.config['APPLICATION_ROOT']] = sub_app
 
     info_app = flask.Flask(__name__)

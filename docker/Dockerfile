@@ -26,6 +26,9 @@ RUN chown ntg:ntg /usr/local/bin/docker-entrypoint.sh
 RUN chown ntg:ntg -R /home/ntg/client
 # "Start CBGM" writes new instance .conf files here at runtime.
 RUN chown ntg:ntg -R /home/ntg/instance
+# Per-project instance confs land here (kept out of instance/ so it can be a
+# persistent volume); see CBGM_PROJECTS_DIR.
+RUN mkdir -p /home/ntg/projects && chown ntg:ntg /home/ntg/projects
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 5000
