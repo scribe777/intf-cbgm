@@ -113,6 +113,9 @@
                   <a v-if="p.instance_root" @click="refresh_all(p)"
                     >Refresh All Decisions</a
                   >
+                  <a v-if="p.instance_root" @click="recompute(p)"
+                    >Recompute coherence</a
+                  >
                 </div>
               </template>
             </td>
@@ -308,7 +311,7 @@ export default {
     importing: function(p) {
       return (
         p.import &&
-        ["provisioning", "importing", "restoring", "refreshing"].indexOf(
+        ["provisioning", "importing", "restoring", "refreshing", "recomputing"].indexOf(
           p.import.state
         ) !== -1
       );
@@ -385,6 +388,8 @@ export default {
       const vm = this;
       vm.menu_open = null;
       if (!p.instance_root) return;
+      // offer (not force) a coherence recompute once the refresh completes
+      p._offer_recompute = true;
       vm.$set(p, "import", {
         state: "refreshing",
         message: "loading decisions",
@@ -395,6 +400,40 @@ export default {
         .post(url.resolve(window.api_base_url, p.instance_root + "editorial/refresh_all.json"))
         .then(function() {
           vm.ensure_polling();
+        });
+    },
+    recompute: function(p) {
+      const vm = this;
+      vm.menu_open = null;
+      vm.$set(p, "import", {
+        state: "recomputing",
+        message: "starting",
+        done: 0,
+        total: 0
+      });
+      axios
+        .post(
+          url.resolve(
+            window.api_base_url,
+            "projects/" + p.project_id + "/recompute.json"
+          )
+        )
+        .then(function(r) {
+          const d = (r.data && r.data.data) || r.data || {};
+          if (d.started === false) {
+            vm.$set(p, "import", {
+              state: "error",
+              message: d.error || "could not start recompute"
+            });
+            return;
+          }
+          vm.ensure_polling();
+        })
+        .catch(function(e) {
+          vm.$set(p, "import", {
+            state: "error",
+            message: (e.response && e.response.statusText) || "request failed"
+          });
         });
     },
     done: function(p) {
@@ -453,6 +492,27 @@ export default {
             if (!active) {
               clearInterval(vm._poll);
               vm._poll = null;
+              // A finished Refresh All optionally chains into a coherence
+              // recompute (not forced — it can take a while; you may just want
+              // the decisions synced/loaded and nothing more).
+              let chained = false;
+              for (const p of vm.projects) {
+                if (!p._offer_recompute) continue;
+                p._offer_recompute = false;
+                if (
+                  p.import &&
+                  p.import.state === "done" &&
+                  window.confirm(
+                    "Decisions refreshed. Recompute coherence (closest" +
+                      " relatives & textual flow) now? This can take a while" +
+                      " — you can also skip it and do it later."
+                  )
+                ) {
+                  vm.recompute(p);
+                  chained = true;
+                }
+              }
+              if (chained) return; // recompute restarted polling; defer reload
               // Reload the list so a just-finished import shows its "Open" link
               // (its instance is now mounted).
               vm.refresh_projects();

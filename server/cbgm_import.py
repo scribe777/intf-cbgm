@@ -177,16 +177,23 @@ def _pg_restore(cfg, dbname, dump_path):
         env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
 
+def _conf_path_for(cfg, dbname):
+    """Path of a project's instance .conf (in the persistable projects dir)."""
+
+    instance_dir = (cfg.get('CBGM_PROJECTS_DIR')
+                    or cfg.get('INSTANCE_DIR') or os.path.abspath('instance'))
+    return os.path.join(instance_dir, '%s.conf' % dbname)
+
+
 def _write_instance_conf(cfg, pid, name, dbname, object_part):
     """Write an instance .conf so the tool can serve the imported project."""
 
     # Write to the persistable projects dir (kept separate from the baked
     # instance/ dir so it can be a volume).  See __main__.Config.
-    instance_dir = (cfg.get('CBGM_PROJECTS_DIR')
-                    or cfg.get('INSTANCE_DIR') or os.path.abspath('instance'))
+    path = _conf_path_for(cfg, dbname)
+    instance_dir = os.path.dirname(path)
     if not os.path.isdir(instance_dir):
         os.makedirs(instance_dir, exist_ok=True)
-    path = os.path.join(instance_dir, '%s.conf' % dbname)
     conf = (
         'APPLICATION_NAME="%(name)s"\n'
         'APPLICATION_ROOT="%(root)s"\n'
@@ -294,6 +301,58 @@ def _worker_dump(app, pid, name, dump_path, object_part):
                 pass
 
 
+# cbgm.py log lines -> (needle, user-facing message); also gives a step count.
+_CBGM_PHASES = [
+    ("Rebuilding the 'A' text", "reconstructing initial text ‘A’"),
+    ("Creating the labez matrix", "building reading matrix"),
+    ("pre-co", "pre-genealogical coherence (closest relatives)"),
+    ("post-co", "genealogical coherence (textual flow)"),
+    ("Writing affinity", "writing affinity table"),
+]
+
+
+def _cbgm_worker(app, pid):
+    """Run the full cbgm pass (build_A_text + preco + postco) for a project.
+
+    Recomputes the affinity table from the CURRENT apparatus + locstem
+    decisions, so closest-relatives and textual-flow reflect the latest
+    decisions.  Runs the same `scripts.cbgm <conf>` the CLI uses.
+    """
+
+    with app.app_context():
+        cfg = current_app.config
+        conf = _conf_path_for(cfg, db_name_for(pid))
+        if not os.path.isfile(conf):
+            _set(pid, state='error', message='project not provisioned')
+            return
+        total = len(_CBGM_PHASES)
+        _set(pid, state='recomputing', done=0, total=total, message='starting')
+        try:
+            proc = subprocess.Popen(
+                ['python3', '-m', 'scripts.cbgm', conf],
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                env=dict(os.environ), cwd=os.path.dirname(conf))
+            step = 0
+            for raw in proc.stderr:
+                line = raw.decode('utf-8', 'replace')
+                for needle, msg in _CBGM_PHASES:
+                    if needle in line:
+                        step += 1
+                        _set(pid, state='recomputing', done=step, total=total,
+                             message=msg)
+                        break
+            rc = proc.wait()
+            if rc != 0:
+                _set(pid, state='error', message='cbgm exited with %d' % rc)
+                return
+            _set(pid, state='done', done=total, total=total,
+                 message='coherence recomputed')
+            log.info('Recomputed coherence for project %s', pid)
+        except Exception as e:  # pylint: disable=broad-except
+            log.exception('cbgm recompute failed for project %s', pid)
+            _set(pid, state='error', message=str(e))
+
+
 @bp.route('/projects/<pid>/load_dump.json', methods=['POST', 'OPTIONS'])
 def load_dump(pid):
     """Endpoint.  Load a project from an uploaded CBGM dump file."""
@@ -359,6 +418,33 @@ def start(pid):
     t = threading.Thread(
         target=_worker,
         args=(current_app._get_current_object(), pid, object_part, name),
+        daemon=True)
+    t.start()
+    return make_json_response({'started': True, 'status': get_status(pid)})
+
+
+@bp.route('/projects/<pid>/recompute.json', methods=['POST', 'OPTIONS'])
+def recompute(pid):
+    """Endpoint.  Recompute coherence (the full cbgm pass) for a project."""
+
+    if request.method == 'OPTIONS':
+        return make_json_response({})
+    _require_can_start('recompute coherence')
+
+    st = get_status(pid)
+    if st.get('state') in ('provisioning', 'importing', 'restoring',
+                           'refreshing', 'recomputing'):
+        return make_json_response({'started': False, 'status': st})
+
+    conf = _conf_path_for(current_app.config, db_name_for(pid))
+    if not os.path.isfile(conf):
+        return make_json_response({'started': False,
+                                   'error': 'project not provisioned'})
+
+    _set(pid, state='recomputing', done=0, total=0, message='queued')
+    t = threading.Thread(
+        target=_cbgm_worker,
+        args=(current_app._get_current_object(), pid),
         daemon=True)
     t.start()
     return make_json_response({'started': True, 'status': get_status(pid)})
