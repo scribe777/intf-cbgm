@@ -15,7 +15,7 @@ curl -O https://raw.githubusercontent.com/<org>/intf-cbgm/<branch>/docker/docker
 docker compose -f docker-compose.crosswire.yml up
 ```
 
-Then open **http://localhost:5000**:
+Then open **http://localhost:8088**:
 
 1. Click **Log In** — you're sent to the NTVMR to sign in, and returned logged in.
 2. Your NTVMR projects are listed. Click **Start CBGM** on one.
