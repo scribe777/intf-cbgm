@@ -14,7 +14,10 @@ services:
     image: crosswire/cbgm-db-server:latest
     restart: unless-stopped
     volumes:
-      - pgdata:/var/lib/postgresql        # per-project databases persist here
+      # Mount at PGDATA exactly. The postgres base image declares
+      # VOLUME /var/lib/postgresql/data, so mounting the *parent* leaves the
+      # real data dir on an anonymous volume that is lost on recreate.
+      - pgdata:/var/lib/postgresql/data   # per-project databases persist here
     environment:
       POSTGRES_PASSWORD: topsecret
 
