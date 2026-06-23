@@ -78,14 +78,14 @@ export default {
                 })
                 .catch (() => { vm.users = []; });
         },
-        /** Load a given editor's decisions for this verse, then reload views. */
+        /** Load a given editor's decisions for this passage, then reload views. */
         load_user (who) {
             const vm = this;
-            if (vm.busy || !vm.verse) {
+            if (vm.busy || !vm.pass_id) {
                 return;
             }
             vm.busy = true;
-            vm.post ('editorial/load.json/' + vm.verse
+            vm.post ('editorial/load.json/' + vm.pass_id
                      + '?userName=' + encodeURIComponent (who))
                 .then (() => {
                     vm.loaded = who;

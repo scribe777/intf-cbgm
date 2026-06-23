@@ -81,6 +81,30 @@ def _pg_connect(cfg, dbname, autocommit=False):
     return conn
 
 
+def _pending_count(cfg, dbname):
+    """Unsynced editorial edits (cbgm_pending rows) in a project DB.
+
+    Returns 0 if the DB or the outbox table doesn't exist yet.  Used to guard
+    destructive reloads (a dump-load DROPs the DB and would lose this work).
+    """
+
+    try:
+        conn = _pg_connect(cfg, dbname)
+    except psycopg2.Error:
+        return 0                       # DB doesn't exist yet -> nothing to lose
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT to_regclass('ntg.cbgm_pending')")
+        if cur.fetchone()[0] is None:
+            return 0
+        cur.execute("SELECT count(*) FROM cbgm_pending")
+        return cur.fetchone()[0]
+    except psycopg2.Error:
+        return 0
+    finally:
+        conn.close()
+
+
 def _provision(cfg, dbname):
     """Create the database and clone the (data-less) CBGM schema into it."""
 
@@ -281,6 +305,17 @@ def load_dump(pid):
     st = get_status(pid)
     if st.get('state') in ('provisioning', 'importing', 'restoring'):
         return make_json_response({'started': False, 'status': st})
+
+    # A dump-load DROPs and recreates the DB, wiping the local outbox.  Refuse
+    # if there are unsynced edits, unless the client forces it (after Sync or
+    # an explicit discard).
+    if request.values.get('force') not in ('1', 'true', 'yes'):
+        pending = _pending_count(current_app.config, db_name_for(pid))
+        if pending:
+            return make_json_response(
+                {'started': False, 'needs_sync': True, 'pending': pending,
+                 'error': '%d unsynced edit(s) would be lost; sync or force'
+                          % pending})
 
     f = request.files.get('dump')
     if f is None:

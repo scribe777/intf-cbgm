@@ -1,32 +1,38 @@
 # -*- encoding: utf-8 -*-
 
-"""Per-user, per-verse backup/restore of CBGM editorial decisions to the NTVMR.
+"""Per-user, per-SEGMENT sync of CBGM editorial decisions to the NTVMR.
 
-Each editor's decisions (local stemma, cliques, ms-cliques, notes) are saved
-*per verse*, scoped to *their own* NTVMR user, in the versioned project/data
-store:  key ``cbgm/edits/<verse>``, ``userName=<editor>``.
+Model (agreed design — see project memory / vmrcre/README.md):
 
-Consequences:
-- editors never overwrite each other -- you only ever write your own data;
-- two editors may hold *different* decisions for the same verse (legitimate in
-  textual criticism); the UI can show that and let you toggle to a colleague's;
-- loading is per verse and touches only that verse's passages (we do NOT use
-  load_edits, which is whole-project-replace).
-
-See vmrcre/README.md.
+- **Source of truth = the NTVMR** project-data store.  Local Postgres is a
+  working copy + a durable *offline outbox* (`cbgm_pending`); it is never
+  assumed durable.
+- **Editing is always allowed** for any logged-in user.  *Syncing* to the
+  NTVMR happens only when connectivity AND `CBGM_SAVE_ROLE` are both present;
+  otherwise the segment stays queued in the outbox and is retained until it can
+  be pushed — so work done without the role syncs once the role is granted.
+- **Unit = the passage / variation unit / segment** (natural key
+  ``begadr``/``endadr``), not the verse.  NTVMR key ``cbgm/edits/<begadr>-<endadr>``,
+  ``userName=<editor>``.
+- **We persist decisions, not the apparatus.**  Stored: the full local stemma
+  (``locstem``), any *split* cliques (``clique <> '1'``) and witness
+  re-assignments to them, and notes.  Default clique-``'1'`` witness
+  assignments are apparatus-derived and reconstructed locally, never stored.
+- **apply = overlay on the CURRENT apparatus**, never a frozen snapshot: a
+  witness added to the apparatus a year later just flows with the reading it
+  supports; earlier genealogical decisions still apply.
 """
 
 import json
 import logging
 import threading
-import time
 
 import flask
 from flask import current_app, request
 import flask_login
 
 import login  # ntvmr_service_request
-from helpers import make_json_response
+from helpers import make_json_response, Passage
 
 bp = flask.Blueprint('cbgm_backup', __name__)
 log = logging.getLogger(__name__)
@@ -34,19 +40,19 @@ log = logging.getLogger(__name__)
 EDITS_KEY_PREFIX = 'cbgm/edits/'
 EDITS_SUBKEY = 'data'
 
-# CBGM book id (1=Matthew .. 27=Revelation) -> OSIS book code, for verse keys.
+# CBGM book id (1=Matthew .. 27=Revelation) -> OSIS book code, for display refs.
 OSIS_BOOKS = [
     None, 'Matt', 'Mark', 'Luke', 'John', 'Acts', 'Rom', '1Cor', '2Cor', 'Gal',
     'Eph', 'Phil', 'Col', '1Thess', '2Thess', '1Tim', '2Tim', 'Titus', 'Phlm',
     'Heb', 'Jas', '1Pet', '2Pet', '1John', '2John', '3John', 'Jude', 'Rev',
 ]
 
-_timers = {}     # (pid, verse) -> debounce Timer
+_timers = {}     # (pid, begadr, endadr, user) -> debounce Timer
 _lock = threading.Lock()
 
 
 # --------------------------------------------------------------------------- #
-# Address <-> verse
+# Address helpers
 # --------------------------------------------------------------------------- #
 
 def verse_base(begadr):
@@ -55,7 +61,7 @@ def verse_base(begadr):
 
 
 def verse_ref(begadr):
-    """OSIS-ish verse reference for an address, e.g. '1Tim.1.5'."""
+    """OSIS-ish verse reference for an address, e.g. '1Tim.1.5' (display only)."""
     base = verse_base(begadr)
     book = base // 10000000
     chapter = (base // 100000) % 100
@@ -64,69 +70,186 @@ def verse_ref(begadr):
     return '%s.%d.%d' % (name, chapter, verse)
 
 
+def passage_ref(begadr, endadr):
+    """Canonical, path-safe passage reference used as the storage key.
+
+    The clearly-defined passage identity (NOT a changeable surrogate like
+    pass_id): e.g. 'John.1.5.2-4' or 'John.2.7.24-8.2'.  Derived from the
+    tool's own human-readable form (``Passage.static_to_hr`` -> 'John 1:5/2-4')
+    with ':' '/' and spaces turned into '.' so it is a single key path segment.
+    Stable across an apparatus *re-import* (addresses are recomputed from the
+    same references); pass_id is not, which is why we never key on it.
+    """
+
+    hr = Passage.static_to_hr(int(begadr), int(endadr))
+    return (hr.replace(' - ', '-').replace(':', '.')
+              .replace('/', '.').replace(' ', '.'))
+
+
 # --------------------------------------------------------------------------- #
-# Export / apply a verse's editorial decisions in the project database
+# Export / apply ONE segment's decisions (delta out, overlay in)
 # --------------------------------------------------------------------------- #
 
-def export_verse(conn, vbase):
-    """Return a fragment dict of all editorial decisions in one verse."""
+def export_segment(conn, begadr, endadr):
+    """Return the decision *delta* for one passage, or None if it's absent.
 
-    lo, hi = vbase, vbase + 1000
-    cur = conn.cursor()
-    cur.execute("SELECT pass_id, begadr, endadr FROM passages"
-                " WHERE begadr >= %s AND begadr < %s ORDER BY begadr", (lo, hi))
-    passages = []
-    for pass_id, begadr, endadr in cur.fetchall():
-        p = {'begadr': begadr, 'endadr': endadr}
-        cur.execute("SELECT labez, clique FROM cliques WHERE pass_id=%s", (pass_id,))
-        p['cliques'] = cur.fetchall()
-        cur.execute("SELECT labez, clique, source_labez, source_clique"
-                    " FROM locstem WHERE pass_id=%s", (pass_id,))
-        p['locstem'] = cur.fetchall()
-        cur.execute("SELECT m.hsnr, c.labez, c.clique FROM ms_cliques c"
-                    " JOIN manuscripts m ON m.ms_id=c.ms_id WHERE c.pass_id=%s", (pass_id,))
-        p['ms_cliques'] = cur.fetchall()
-        cur.execute("SELECT note FROM notes WHERE pass_id=%s", (pass_id,))
-        p['notes'] = [r[0] for r in cur.fetchall()]
-        passages.append(p)
-    return {'passages': passages}
-
-
-def apply_verse(conn, fragment, user_id=0):
-    """Apply a verse fragment, replacing editorial rows for ONLY its passages."""
+    Delta = full locstem (the stemma) + split cliques + non-default witness
+    clique assignments + notes.  Default clique-'1' assignments are apparatus
+    data and are intentionally NOT exported.
+    """
 
     cur = conn.cursor()
+    cur.execute("SELECT pass_id FROM passages WHERE begadr=%s AND endadr=%s",
+                (begadr, endadr))
+    row = cur.fetchone()
+    if row is None:
+        return None
+    pass_id = row[0]
+    frag = {'begadr': int(begadr), 'endadr': int(endadr)}
+    cur.execute("SELECT labez, clique, source_labez, source_clique"
+                " FROM locstem WHERE pass_id=%s ORDER BY labez, clique", (pass_id,))
+    frag['locstem'] = cur.fetchall()
+    cur.execute("SELECT labez, clique FROM cliques"
+                " WHERE pass_id=%s AND clique <> '1' ORDER BY labez, clique",
+                (pass_id,))
+    frag['cliques'] = cur.fetchall()
+    cur.execute("SELECT m.hsnr, c.labez, c.clique FROM ms_cliques c"
+                " JOIN manuscripts m ON m.ms_id=c.ms_id"
+                " WHERE c.pass_id=%s AND c.clique <> '1' ORDER BY m.hsnr", (pass_id,))
+    frag['ms_cliques'] = cur.fetchall()
+    cur.execute("SELECT note FROM notes WHERE pass_id=%s", (pass_id,))
+    frag['notes'] = [r[0] for r in cur.fetchall()]
+    return frag
+
+
+def apply_segment(conn, frag, user_id=0):
+    """Overlay a segment's decisions onto the CURRENT apparatus.
+
+    Never deletes the apparatus-derived witness rows, so witnesses added to the
+    apparatus after the decision was saved keep their default clique and flow
+    with the reading they support.  Returns True if applied, False if the
+    passage isn't in this apparatus.
+    """
+
+    cur = conn.cursor()
+    cur.execute("SELECT pass_id FROM passages WHERE begadr=%s AND endadr=%s",
+                (frag.get('begadr'), frag.get('endadr')))
+    row = cur.fetchone()
+    if row is None:
+        return False
+    pass_id = row[0]
     cur.execute("SET ntg.user_id = %s", (int(user_id or 0),))
-    for p in fragment.get('passages', []):
-        cur.execute("SELECT pass_id FROM passages WHERE begadr=%s AND endadr=%s",
-                    (p['begadr'], p['endadr']))
-        row = cur.fetchone()
-        if row is None:
-            continue                       # passage not in this DB; skip
-        pass_id = row[0]
-        # clear (children before parents): locstem & ms_cliques -> cliques; notes
-        cur.execute("DELETE FROM locstem    WHERE pass_id=%s", (pass_id,))
-        cur.execute("DELETE FROM ms_cliques WHERE pass_id=%s", (pass_id,))
-        cur.execute("DELETE FROM cliques    WHERE pass_id=%s", (pass_id,))
-        cur.execute("DELETE FROM notes      WHERE pass_id=%s", (pass_id,))
-        for labez, clique in p.get('cliques', []):
-            cur.execute("INSERT INTO cliques (pass_id, labez, clique)"
-                        " VALUES (%s,%s,%s)", (pass_id, labez, clique))
-        for labez, clique, slabez, sclique in p.get('locstem', []):
-            cur.execute("INSERT INTO locstem (pass_id, labez, clique, source_labez, source_clique)"
-                        " VALUES (%s,%s,%s,%s,%s)", (pass_id, labez, clique, slabez, sclique))
-        for hsnr, labez, clique in p.get('ms_cliques', []):
-            cur.execute("INSERT INTO ms_cliques (ms_id, pass_id, labez, clique)"
-                        " SELECT ms_id, %s, %s, %s FROM manuscripts WHERE hsnr=%s",
-                        (pass_id, labez, clique, hsnr))
-        for note in p.get('notes', []):
-            cur.execute("INSERT INTO notes (pass_id, note) VALUES (%s,%s)",
-                        (pass_id, note))
+
+    # 1. Release witnesses from any split clique BEFORE dropping split cliques.
+    #    ms_cliques.clique -> cliques is ON DELETE CASCADE, so dropping a split
+    #    clique with a witness still on it would delete the witness row.  Reset
+    #    to '1' keeps every witness (incl. ones added later) on its default.
+    cur.execute("UPDATE ms_cliques SET clique='1'"
+                " WHERE pass_id=%s AND clique <> '1'", (pass_id,))
+    # 2. Drop split cliques (cascades away their locstem rows; '1' rows remain).
+    cur.execute("DELETE FROM cliques WHERE pass_id=%s AND clique <> '1'", (pass_id,))
+    # 3. Recreate the decision's split cliques.
+    for labez, clique in frag.get('cliques', []):
+        if clique == '1':
+            continue
+        cur.execute("INSERT INTO cliques (pass_id, labez, clique)"
+                    " VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",
+                    (pass_id, labez, clique))
+    # 4. Stemma overlay: replace decided readings' locstem, keep defaults for
+    #    readings the decision didn't cover (e.g. variants added later).
+    cur.execute("SELECT labez, clique FROM cliques WHERE pass_id=%s", (pass_id,))
+    existing = set((l, c) for (l, c) in cur.fetchall())
+    covered = set((l, c) for (l, c, _sl, _sc) in frag.get('locstem', [])
+                  if (l, c) in existing)
+    for labez, clique in covered:
+        cur.execute("DELETE FROM locstem WHERE pass_id=%s AND labez=%s AND clique=%s",
+                    (pass_id, labez, clique))
+    for labez, clique, slabez, sclique in frag.get('locstem', []):
+        if (labez, clique) not in existing:
+            continue                       # reading/clique gone from apparatus
+        cur.execute("INSERT INTO locstem"
+                    " (pass_id, labez, clique, source_labez, source_clique)"
+                    " VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                    (pass_id, labez, clique, slabez, sclique))
+    # 5. Witness re-assignments, overlaid on the apparatus defaults.  The labez
+    #    guard means a witness whose apparatus reading changed stays on its
+    #    default (the divergence surfaces rather than being mis-placed).
+    for hsnr, labez, clique in frag.get('ms_cliques', []):
+        if clique == '1' or (labez, clique) not in existing:
+            continue
+        cur.execute("UPDATE ms_cliques SET clique=%s"
+                    " WHERE pass_id=%s AND labez=%s"
+                    "   AND ms_id = (SELECT ms_id FROM manuscripts WHERE hsnr=%s)",
+                    (clique, pass_id, labez, hsnr))
+    # 6. Notes (decision owns them).
+    cur.execute("DELETE FROM notes WHERE pass_id=%s", (pass_id,))
+    for note in frag.get('notes', []):
+        cur.execute("INSERT INTO notes (pass_id, note) VALUES (%s,%s)",
+                    (pass_id, note))
+    conn.commit()
+    return True
+
+
+# --------------------------------------------------------------------------- #
+# Local outbox (cbgm_pending) — per-segment, per-user dirty tracking
+# --------------------------------------------------------------------------- #
+
+def _ensure_outbox(conn):
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS cbgm_pending (
+            begadr     bigint      NOT NULL,
+            endadr     bigint      NOT NULL,
+            user_name  text        NOT NULL,
+            updated_at timestamptz NOT NULL DEFAULT now(),
+            last_error text,
+            PRIMARY KEY (begadr, endadr, user_name)
+        )""")
     conn.commit()
 
 
+def mark_pending(conn, begadr, endadr, user_name, last_error=None):
+    _ensure_outbox(conn)
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO cbgm_pending (begadr, endadr, user_name, updated_at, last_error)
+        VALUES (%s,%s,%s, now(), %s)
+        ON CONFLICT (begadr, endadr, user_name)
+        DO UPDATE SET updated_at = now(), last_error = EXCLUDED.last_error
+        """, (int(begadr), int(endadr), user_name, last_error))
+    conn.commit()
+
+
+def clear_pending(conn, begadr, endadr, user_name):
+    _ensure_outbox(conn)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM cbgm_pending"
+                " WHERE begadr=%s AND endadr=%s AND user_name=%s",
+                (int(begadr), int(endadr), user_name))
+    conn.commit()
+
+
+def is_pending(conn, begadr, endadr, user_name):
+    _ensure_outbox(conn)
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM cbgm_pending"
+                " WHERE begadr=%s AND endadr=%s AND user_name=%s",
+                (int(begadr), int(endadr), user_name))
+    return cur.fetchone() is not None
+
+
+def list_pending(conn, user_name):
+    _ensure_outbox(conn)
+    cur = conn.cursor()
+    cur.execute("SELECT begadr, endadr, last_error, updated_at FROM cbgm_pending"
+                " WHERE user_name=%s ORDER BY begadr, endadr", (user_name,))
+    return [{'begadr': b, 'endadr': e, 'last_error': le,
+             'updated_at': ua.isoformat() if ua else None}
+            for (b, e, le, ua) in cur.fetchall()]
+
+
 # --------------------------------------------------------------------------- #
-# NTVMR project/data (user-scoped, per verse)
+# NTVMR project/data store (user-scoped, per segment)
 # --------------------------------------------------------------------------- #
 
 def _project_id():
@@ -151,21 +274,29 @@ def user_can_save(session_hash):
     return root is not None and root.getAttribute('hasRole') == 'true'
 
 
-def put_verse(project_id, vref, fragment, user_name, session_hash):
-    login.ntvmr_service_request(
+def put_segment(project_id, ref, fragment, user_name, session_hash, push='false'):
+    """Write a segment fragment to the NTVMR under its passage reference.
+
+    Returns the response root, or None on failure (offline / NTVMR
+    unreachable).  Default ``push='false'`` batches the git commit locally on
+    the NTVMR (cheap for many small per-segment writes); explicit save / Sync
+    uses 'true'.
+    """
+
+    return login.ntvmr_service_request(
         'projectmanagement/project/data/put',
-        {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + vref,
+        {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + ref,
          'subKey': EDITS_SUBKEY, 'userName': user_name,
-         'data': json.dumps(fragment), 'push': 'true'},
+         'data': json.dumps(fragment), 'push': push},
         session_hash)
 
 
-def get_verse(project_id, vref, user_name, session_hash):
-    """Return a fragment dict for (verse, user), or None."""
+def get_segment(project_id, ref, user_name, session_hash):
+    """Return a fragment dict for (passage ref, user), or None."""
 
     root = login.ntvmr_service_request(
         'projectmanagement/project/data/get',
-        {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + vref,
+        {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + ref,
          'subKey': EDITS_SUBKEY, 'userName': user_name},
         session_hash)
     if root is None:
@@ -183,31 +314,35 @@ def get_verse(project_id, vref, user_name, session_hash):
     return None
 
 
-def list_all_verses(project_id, session_hash):
-    """All verses that have any saved decisions (children of cbgm/edits)."""
+def list_all_refs(project_id, session_hash):
+    """All passage refs that have any saved decisions (children of cbgm/edits).
 
-    root = login.ntvmr_service_request(
-        'projectmanagement/project/data/listchildren',
-        {'projectID': str(project_id), 'key': 'cbgm/edits'}, session_hash)
-    verses = []
-    if root is not None:
-        for el in root.getElementsByTagName('projectData'):
-            name = (el.getAttribute('key') or '').strip('/')
-            if name and '.' in name:        # verse refs look like '1Tim.1.5'
-                verses.append(name)
-    return verses
-
-
-def list_verse_users(project_id, vref, session_hash):
-    """Usernames that have decisions stored at this verse.
-
-    User-scoped data lives at cbgm/edits/<verse>/initial/<user>/data.txt, so
-    the users are the children of <verse>/initial.
+    Returned opaque -- the begadr/endadr needed to apply live inside each
+    fragment, so the key never has to be parsed back.
     """
 
     root = login.ntvmr_service_request(
         'projectmanagement/project/data/listchildren',
-        {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + vref + '/initial'},
+        {'projectID': str(project_id), 'key': 'cbgm/edits'}, session_hash)
+    refs = []
+    if root is not None:
+        for el in root.getElementsByTagName('projectData'):
+            name = (el.getAttribute('key') or '').strip('/')
+            if name:
+                refs.append(name)
+    return refs
+
+
+def list_segment_users(project_id, ref, session_hash):
+    """Usernames that have decisions stored at this passage.
+
+    User-scoped data lives at cbgm/edits/<ref>/initial/<user>/data.txt, so the
+    users are the children of <ref>/initial.
+    """
+
+    root = login.ntvmr_service_request(
+        'projectmanagement/project/data/listchildren',
+        {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + ref + '/initial'},
         session_hash)
     users = set()
     if root is not None:
@@ -219,31 +354,72 @@ def list_verse_users(project_id, vref, session_hash):
 
 
 # --------------------------------------------------------------------------- #
-# Auto-save (debounced, per verse, as the current user)
+# Outbox flush (push pending segments when connectivity + permission allow)
 # --------------------------------------------------------------------------- #
 
-def schedule_backup(app, project_id, vbase, user_name, session_hash, delay=8):
+def flush_pending(app, project_id, user_name, session_hash, push='true'):
+    """Try to push all of the user's pending segments to the NTVMR.
+
+    Pending work is *retained* on failure: without the save role it is kept and
+    annotated (so it syncs once the role is granted); if the NTVMR is
+    unreachable it is kept and retried later.  Returns (pushed, remaining).
+    """
+
     if not (project_id and user_name and session_hash):
+        return (0, 0)
+    with app.app_context():
+        can = user_can_save(session_hash)
+        conn = app.config.dba.engine.raw_connection()
+        pushed = 0
+        try:
+            pend = list_pending(conn, user_name)
+            if not pend:
+                return (0, 0)
+            if not can:
+                for p in pend:
+                    mark_pending(conn, p['begadr'], p['endadr'], user_name,
+                                 last_error='awaiting Project CBGM Editor role')
+                return (0, len(pend))
+            for p in pend:
+                frag = export_segment(conn, p['begadr'], p['endadr'])
+                if frag is None:
+                    clear_pending(conn, p['begadr'], p['endadr'], user_name)
+                    continue               # passage no longer in this apparatus
+                ref = passage_ref(p['begadr'], p['endadr'])
+                ok = put_segment(project_id, ref, frag,
+                                 user_name, session_hash, push=push)
+                if ok is not None:
+                    clear_pending(conn, p['begadr'], p['endadr'], user_name)
+                    pushed += 1
+                else:
+                    mark_pending(conn, p['begadr'], p['endadr'], user_name,
+                                 last_error='offline / NTVMR unreachable')
+            return (pushed, len(list_pending(conn, user_name)))
+        finally:
+            conn.close()
+
+
+def on_edit(app, project_id, begadr, endadr, user_name, session_hash, delay=8):
+    """Called when a segment is edited: mark it dirty now, debounce a flush."""
+
+    if not (project_id and user_name and session_hash and begadr):
         return
-    vref = verse_ref(vbase)
-    key = (str(project_id), vref)
+    try:
+        conn = app.config.dba.engine.raw_connection()
+        try:
+            mark_pending(conn, begadr, endadr, user_name)
+        finally:
+            conn.close()
+    except Exception:  # pylint: disable=broad-except
+        log.exception('failed to mark segment %s-%s pending', begadr, endadr)
+
+    key = (str(project_id), int(begadr), int(endadr), user_name)
 
     def run():
-        with app.app_context():
-            try:
-                if not user_can_save(session_hash):
-                    log.info('skip auto-save of %s: %s lacks save permission'
-                             ' on this project', vref, user_name)
-                    return
-                conn = app.config.dba.engine.raw_connection()
-                try:
-                    fragment = export_verse(conn, vbase)
-                finally:
-                    conn.close()
-                put_verse(project_id, vref, fragment, user_name, session_hash)
-                log.info('Auto-saved editorial verse %s for %s', vref, user_name)
-            except Exception:  # pylint: disable=broad-except
-                log.exception('auto-save failed for verse %s', vref)
+        try:
+            flush_pending(app, project_id, user_name, session_hash)
+        except Exception:  # pylint: disable=broad-except
+            log.exception('flush after edit failed for %s-%s', begadr, endadr)
 
     with _lock:
         old = _timers.get(key)
@@ -264,48 +440,42 @@ def _current_user_name():
     return u.username if getattr(u, 'is_authenticated', False) else None
 
 
-@bp.route('/editorial/users.json/<path:vref>')
-def editorial_users(vref):
-    """Which editors have decisions at this verse (and is one of them me)?"""
-
-    me = _current_user_name()
-    sh = getattr(flask_login.current_user, 'api_key', None)
-    users = list_verse_users(_project_id(), vref, sh) if sh else []
-    return make_json_response({'verse': vref, 'users': users, 'me': me,
-                               'mine': me in users})
+def _seg_of_passage(conn, pass_id):
+    cur = conn.cursor()
+    cur.execute("SELECT begadr, endadr FROM passages WHERE pass_id=%s", (pass_id,))
+    return cur.fetchone()
 
 
 @bp.route('/editorial/users_by_passage.json/<int:pass_id>')
 def editorial_users_by_passage(pass_id):
-    """Like editorial_users, but keyed by passage id (what the client knows).
-
-    Resolves the passage's verse, then reports which editors have decisions
-    saved there.  Drives the "other editors have decisions here" indicator.
-    """
+    """Which editors have decisions saved at this passage (and is one of them
+    me)?  Drives the "other editors have decisions here" indicator."""
 
     me = _current_user_name()
     sh = getattr(flask_login.current_user, 'api_key', None)
     conn = current_app.config.dba.engine.raw_connection()
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT begadr FROM passages WHERE pass_id = %s", (pass_id,))
-        row = cur.fetchone()
+        seg = _seg_of_passage(conn, pass_id)
     finally:
         conn.close()
-    vref = verse_ref(row[0]) if row else None
-    users = list_verse_users(_project_id(), vref, sh) if (sh and vref) else []
-    return make_json_response({'verse': vref, 'pass_id': pass_id,
+    if not (seg and sh):
+        return make_json_response({'pass_id': pass_id, 'users': [], 'me': me,
+                                   'mine': False})
+    begadr, endadr = seg
+    ref = passage_ref(begadr, endadr)
+    users = list_segment_users(_project_id(), ref, sh)
+    return make_json_response({'pass_id': pass_id, 'verse': verse_ref(begadr),
+                               'ref': ref,
                                'users': users, 'me': me, 'mine': me in users})
 
 
 @bp.route('/editorial/autoload.json/<int:pass_id>', methods=['POST', 'OPTIONS'])
 def editorial_autoload(pass_id):
-    """Auto-apply this passage's saved decisions when a verse is opened.
+    """Auto-apply this passage's saved decisions when it is opened.
 
-    Picks the same editor the per-verse load would (mine if I have data here,
-    else whichever collaborator does) and applies it into the local DB, so the
-    stemma reflects saved work instead of the dump/import baseline.  No-op (and
-    harmless) when nobody has data at this verse.
+    Skips when the passage is dirty for me (never clobbers my unsynced local
+    work).  Otherwise applies mine if I have data here, else a collaborator's.
+    No-op when no one has data.
     """
 
     if request.method == 'OPTIONS':
@@ -316,55 +486,64 @@ def editorial_autoload(pass_id):
         return make_json_response({'loaded': False})
     conn = current_app.config.dba.engine.raw_connection()
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT begadr FROM passages WHERE pass_id = %s", (pass_id,))
-        row = cur.fetchone()
-        if not row:
+        seg = _seg_of_passage(conn, pass_id)
+        if not seg:
             return make_json_response({'loaded': False})
-        vref = verse_ref(row[0])
-        users = list_verse_users(_project_id(), vref, sh)
+        begadr, endadr = seg
+        ref = passage_ref(begadr, endadr)
+        if me and is_pending(conn, begadr, endadr, me):
+            # I have unsynced local edits here -- don't overwrite them.
+            return make_json_response({'loaded': False, 'dirty': True, 'ref': ref})
+        users = list_segment_users(_project_id(), ref, sh)
         who = me if me in users else (users[0] if users else None)
         if not who:
-            return make_json_response({'loaded': False, 'verse': vref})
-        fragment = get_verse(_project_id(), vref, who, sh)
-        if fragment is None:
-            return make_json_response({'loaded': False, 'verse': vref})
-        uid = getattr(flask_login.current_user, 'id', 0)
-        apply_verse(conn, fragment, uid)
+            return make_json_response({'loaded': False, 'ref': ref})
+        frag = get_segment(_project_id(), ref, who, sh)
+        if frag is None:
+            return make_json_response({'loaded': False, 'ref': ref})
+        apply_segment(conn, frag, getattr(flask_login.current_user, 'id', 0))
     finally:
         conn.close()
-    return make_json_response({'loaded': True, 'verse': vref, 'user': who})
+    return make_json_response({'loaded': True, 'user': who, 'ref': ref})
 
 
-@bp.route('/editorial/load.json/<path:vref>', methods=['POST', 'OPTIONS'])
-def editorial_load(vref):
-    """Load a verse's decisions (own by default, or ?userName=) into the DB."""
+@bp.route('/editorial/load.json/<int:pass_id>', methods=['POST', 'OPTIONS'])
+def editorial_load(pass_id):
+    """Load a passage's decisions (own by default, or ?userName=) into the DB.
+
+    Explicit user action (the indicator toggle), so it overrides even a dirty
+    local state -- the client confirms first.
+    """
 
     if request.method == 'OPTIONS':
         return make_json_response({})
     me = _current_user_name()
     sh = getattr(flask_login.current_user, 'api_key', None)
-    who = request.values.get('userName')
-    if not who and sh:
-        # No explicit editor requested: prefer my own decisions, else load
-        # whichever editor has data at this verse (collaborator's work).
-        users = list_verse_users(_project_id(), vref, sh)
-        who = me if me in users else (users[0] if users else me)
-    fragment = get_verse(_project_id(), vref, who, sh) if (sh and who) else None
-    if fragment is None:
-        return make_json_response({'loaded': False, 'verse': vref, 'user': who})
-    uid = getattr(flask_login.current_user, 'id', 0)
+    if not sh:
+        return make_json_response({'loaded': False})
     conn = current_app.config.dba.engine.raw_connection()
     try:
-        apply_verse(conn, fragment, uid)
+        seg = _seg_of_passage(conn, pass_id)
+        if not seg:
+            return make_json_response({'loaded': False})
+        begadr, endadr = seg
+        ref = passage_ref(begadr, endadr)
+        who = request.values.get('userName')
+        if not who:
+            users = list_segment_users(_project_id(), ref, sh)
+            who = me if me in users else (users[0] if users else me)
+        frag = get_segment(_project_id(), ref, who, sh) if who else None
+        if frag is None:
+            return make_json_response({'loaded': False, 'user': who, 'ref': ref})
+        apply_segment(conn, frag, getattr(flask_login.current_user, 'id', 0))
     finally:
         conn.close()
-    return make_json_response({'loaded': True, 'verse': vref, 'user': who})
+    return make_json_response({'loaded': True, 'user': who, 'ref': ref})
 
 
-@bp.route('/editorial/save.json/<path:vref>', methods=['POST', 'OPTIONS'])
-def editorial_save(vref):
-    """Explicitly save this verse's decisions as the current user."""
+@bp.route('/editorial/save.json/<int:pass_id>', methods=['POST', 'OPTIONS'])
+def editorial_save(pass_id):
+    """Explicitly save this passage's decisions to the NTVMR as the current user."""
 
     if request.method == 'OPTIONS':
         return make_json_response({})
@@ -372,59 +551,96 @@ def editorial_save(vref):
     sh = getattr(flask_login.current_user, 'api_key', None)
     if not (me and sh):
         return make_json_response({'saved': False, 'reason': 'not logged in'})
-    if not user_can_save(sh):
-        return make_json_response(
-            {'saved': False,
-             'reason': 'you do not have permission to save to this project'})
-    # vref like '1Tim.1.5' -> we need the address; re-derive from the DB.
     conn = current_app.config.dba.engine.raw_connection()
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT begadr FROM passages ORDER BY begadr")
-        vbase = None
-        for (begadr,) in cur.fetchall():
-            if verse_ref(begadr) == vref:
-                vbase = verse_base(begadr)
-                break
-        if vbase is None:
-            return make_json_response({'saved': False, 'reason': 'verse not found'})
-        fragment = export_verse(conn, vbase)
+        seg = _seg_of_passage(conn, pass_id)
+        if not seg:
+            return make_json_response({'saved': False, 'reason': 'passage not found'})
+        begadr, endadr = seg
+        ref = passage_ref(begadr, endadr)
+        # Always record intent in the outbox first (durable even if save fails).
+        mark_pending(conn, begadr, endadr, me)
+        if not user_can_save(sh):
+            return make_json_response(
+                {'saved': False, 'queued': True,
+                 'reason': 'no Project CBGM Editor role; queued to sync later',
+                 'ref': ref})
+        frag = export_segment(conn, begadr, endadr)
+        ok = put_segment(_project_id(), ref, frag, me, sh, push='true') \
+            if frag is not None else None
+        if ok is None:
+            return make_json_response(
+                {'saved': False, 'queued': True,
+                 'reason': 'offline / NTVMR unreachable; queued',
+                 'ref': ref})
+        clear_pending(conn, begadr, endadr, me)
     finally:
         conn.close()
-    put_verse(_project_id(), vref, fragment, me, sh)
-    return make_json_response({'saved': True, 'verse': vref, 'user': me})
+    return make_json_response({'saved': True, 'user': me, 'ref': ref})
+
+
+@bp.route('/editorial/status.json')
+def editorial_status():
+    """Outbox status for the current user: pending segments + can-save flag."""
+
+    me = _current_user_name()
+    sh = getattr(flask_login.current_user, 'api_key', None)
+    if not me:
+        return make_json_response({'pending': [], 'count': 0, 'can_save': False})
+    conn = current_app.config.dba.engine.raw_connection()
+    try:
+        pending = list_pending(conn, me)
+    finally:
+        conn.close()
+    can = user_can_save(sh) if sh else False
+    return make_json_response({'pending': pending, 'count': len(pending),
+                               'can_save': can, 'me': me})
+
+
+@bp.route('/editorial/sync.json', methods=['POST', 'OPTIONS'])
+def editorial_sync():
+    """Flush the current user's outbox to the NTVMR now."""
+
+    if request.method == 'OPTIONS':
+        return make_json_response({})
+    me = _current_user_name()
+    sh = getattr(flask_login.current_user, 'api_key', None)
+    pid = _project_id()
+    if not (me and sh and pid):
+        return make_json_response({'synced': False, 'reason': 'not logged in'})
+    pushed, remaining = flush_pending(current_app._get_current_object(), pid, me, sh)
+    return make_json_response({'synced': True, 'pushed': pushed,
+                               'remaining': remaining,
+                               'can_save': user_can_save(sh)})
 
 
 def _refresh_all_worker(app, project_id, user_name, session_hash, user_id):
-    """Load every saved verse's decisions into the DB (for whole-project analysis)."""
+    """Apply every saved segment's decisions into the DB (whole-project analysis)."""
 
     import cbgm_import  # share its status dict so import_status.json shows progress
     with app.app_context():
         try:
-            verses = list_all_verses(project_id, session_hash)
-            total = len(verses)
+            refs = list_all_refs(project_id, session_hash)
+            total = len(refs)
             cbgm_import._set(project_id, state='refreshing', done=0, total=total,
                              message='loading decisions')
             conn = app.config.dba.engine.raw_connection()
             try:
-                for i, vref in enumerate(verses, 1):
-                    # Prefer this user's own decisions at the verse; otherwise
-                    # load whichever editor has data (so collaborators' work is
-                    # included in whole-project analysis).
-                    users = list_verse_users(project_id, vref, session_hash)
+                for i, ref in enumerate(refs, 1):
+                    users = list_segment_users(project_id, ref, session_hash)
                     who = (user_name if user_name in users
                            else (users[0] if users else None))
-                    fragment = (get_verse(project_id, vref, who, session_hash)
-                                if who else None)
-                    if fragment:
-                        apply_verse(conn, fragment, user_id)
+                    frag = (get_segment(project_id, ref, who, session_hash)
+                            if who else None)
+                    if frag:
+                        apply_segment(conn, frag, user_id)
                     cbgm_import._set(project_id, state='refreshing', done=i,
-                                     total=total, message=vref)
+                                     total=total, message=ref)
             finally:
                 conn.close()
             cbgm_import._set(project_id, state='done', done=total, total=total,
                              message='decisions loaded')
-            log.info('Refreshed %d verses of decisions for project %s (%s)',
+            log.info('Refreshed %d segments of decisions for project %s (%s)',
                      total, project_id, user_name)
         except Exception as e:  # pylint: disable=broad-except
             log.exception('refresh-all failed for project %s', project_id)
@@ -433,8 +649,8 @@ def _refresh_all_worker(app, project_id, user_name, session_hash, user_id):
 
 @bp.route('/editorial/refresh_all.json', methods=['POST', 'OPTIONS'])
 def editorial_refresh_all():
-    """Walk all saved verses and load each editor decision into the DB, so the
-    coherence/affinity analysis runs across the whole project."""
+    """Walk all saved segments and apply each editor's decisions into the DB, so
+    the coherence/affinity analysis runs across the whole project."""
 
     if request.method == 'OPTIONS':
         return make_json_response({})

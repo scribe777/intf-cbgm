@@ -228,15 +228,15 @@ def stemma_edit (passage_or_id):
 
         # return the changed passage
         passage = Passage (conn, passage_or_id)
-        # auto-save this verse's editorial decisions to the NTVMR (debounced,
-        # per-user, per-verse).  See cbgm_backup / vmrcre/README.md.
+        # mark this segment dirty in the local outbox and debounce a flush to
+        # the NTVMR (per-user, per-segment).  See cbgm_backup / vmrcre/README.md.
         try:
             import cbgm_backup
             user = flask_login.current_user
-            cbgm_backup.schedule_backup (
+            cbgm_backup.on_edit (
                 current_app._get_current_object (),
                 current_app.config.get ('NTVMR_PROJECT_ID'),
-                cbgm_backup.verse_base (passage.start),
+                passage.start, passage.end,
                 getattr (user, 'username', None),
                 getattr (user, 'api_key', None))
         except Exception:  # pylint: disable=broad-except
