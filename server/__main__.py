@@ -77,6 +77,7 @@ class Config ():
     WRITE_ACCESS = 'none'
     CORS_ALLOW_ORIGIN = '*'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # allow large CBGM dump uploads
     # NTVMR single sign-on (see vmrcre/README.md).  Override per instance.
     # Overridable via environment (so the published image is configured from
     # the compose file).  See vmrcre/README.md.

@@ -16,6 +16,7 @@ for progress.  See vmrcre/README.md.
 import logging
 import os
 import subprocess
+import tempfile
 import threading
 
 import flask
@@ -103,6 +104,39 @@ def _provision(cfg, dbname):
         conn.close()
 
 
+def _recreate_database(cfg, dbname):
+    """Drop (if present) and create a fresh DB with an empty ntg schema."""
+
+    maint_db = cfg.get('PGDATABASE', 'ntg_user')
+    conn = _pg_connect(cfg, maint_db, autocommit=True)
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT pg_terminate_backend(pid) FROM pg_stat_activity"
+                    " WHERE datname = %s AND pid <> pg_backend_pid()", (dbname,))
+        cur.execute('DROP DATABASE IF EXISTS "%s"' % dbname)
+        cur.execute('CREATE DATABASE "%s" OWNER %s' % (dbname, cfg['PGUSER']))
+    finally:
+        conn.close()
+    conn = _pg_connect(cfg, dbname, autocommit=True)
+    try:
+        cur = conn.cursor()
+        cur.execute('CREATE SCHEMA IF NOT EXISTS ntg AUTHORIZATION %s' % cfg['PGUSER'])
+        cur.execute('ALTER DATABASE "%s" SET search_path = ntg, public' % dbname)
+    finally:
+        conn.close()
+
+
+def _pg_restore(cfg, dbname, dump_path):
+    """Restore a CBGM custom-format dump into the (fresh) database."""
+
+    env = dict(os.environ, PGHOST=cfg['PGHOST'],
+               PGPORT=str(cfg.get('PGPORT', 5432)), PGUSER=cfg['PGUSER'])
+    # pg_restore returns non-zero on benign warnings; don't treat that as fatal.
+    subprocess.run(
+        ['pg_restore', '--no-owner', '-n', 'ntg', '-d', dbname, dump_path],
+        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+
 def _write_instance_conf(cfg, pid, name, dbname, object_part):
     """Write an instance .conf so the tool can serve the imported project."""
 
@@ -174,6 +208,82 @@ def _worker(app, pid, object_part, name):
         except Exception as e:  # pylint: disable=broad-except
             log.exception('Start CBGM failed for project %s', pid)
             _set(pid, state='error', message=str(e))
+
+
+def _worker_dump(app, pid, name, dump_path, object_part):
+    """Load an existing CBGM database from an uploaded dump (e.g. an ITSEE/old
+    docker-image apparatus not present in the NTVMR)."""
+
+    with app.app_context():
+        cfg = current_app.config
+        dbname = db_name_for(pid)
+        try:
+            _set(pid, state='provisioning', done=0, total=0, name=name,
+                 message='creating database')
+            _recreate_database(cfg, dbname)
+
+            _set(pid, state='restoring', message='restoring dump')
+            _pg_restore(cfg, dbname, dump_path)
+
+            # Older dumps type labez as varchar(3); widen so the tool/editor and
+            # our per-verse backup handle longer sub-reading labels.
+            conn = _pg_connect(cfg, dbname)
+            try:
+                ntvmrimport.Importer(conn, '', '-1').widen_labez_columns()
+            finally:
+                conn.close()
+
+            conf_path = _write_instance_conf(cfg, pid, name, dbname, object_part)
+            try:
+                import __main__ as server_main
+                if hasattr(server_main, 'mount_instance'):
+                    server_main.mount_instance(conf_path)
+            except Exception:  # pylint: disable=broad-except
+                log.exception('live mount failed; instance appears on restart')
+            _set(pid, state='done', message='loaded from dump',
+                 app_root=app_root_for(pid))
+            log.info('Loaded CBGM dump for project %s (%s)', pid, name)
+        except Exception as e:  # pylint: disable=broad-except
+            log.exception('dump load failed for project %s', pid)
+            _set(pid, state='error', message=str(e))
+        finally:
+            try:
+                os.unlink(dump_path)
+            except OSError:
+                pass
+
+
+@bp.route('/projects/<pid>/load_dump.json', methods=['POST', 'OPTIONS'])
+def load_dump(pid):
+    """Endpoint.  Load a project from an uploaded CBGM dump file."""
+
+    if request.method == 'OPTIONS':
+        return make_json_response({})
+    role = current_app.config.get('CBGM_START_ROLE', 'Editor')
+    if not flask_login.current_user.has_role(role):
+        raise PrivilegeError('You need CBGM %s access to load a dump.' % role)
+
+    st = get_status(pid)
+    if st.get('state') in ('provisioning', 'importing', 'restoring'):
+        return make_json_response({'started': False, 'status': st})
+
+    f = request.files.get('dump')
+    if f is None:
+        return make_json_response({'started': False, 'error': 'no dump file'})
+    name = request.values.get('name') or ('Project %s' % pid)
+    object_part = request.values.get('object_part', '')
+
+    fd, tmp = tempfile.mkstemp(suffix='.dump')
+    os.close(fd)
+    f.save(tmp)
+
+    _set(pid, state='provisioning', done=0, total=0, name=name, message='uploaded')
+    t = threading.Thread(
+        target=_worker_dump,
+        args=(current_app._get_current_object(), pid, name, tmp, object_part),
+        daemon=True)
+    t.start()
+    return make_json_response({'started': True, 'status': get_status(pid)})
 
 
 @bp.route('/projects/<pid>/start.json', methods=['POST', 'OPTIONS'])

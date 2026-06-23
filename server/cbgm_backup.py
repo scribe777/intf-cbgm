@@ -165,6 +165,21 @@ def get_verse(project_id, vref, user_name, session_hash):
     return None
 
 
+def list_all_verses(project_id, session_hash):
+    """All verses that have any saved decisions (children of cbgm/edits)."""
+
+    root = login.ntvmr_service_request(
+        'projectmanagement/project/data/listchildren',
+        {'projectID': str(project_id), 'key': 'cbgm/edits'}, session_hash)
+    verses = []
+    if root is not None:
+        for el in root.getElementsByTagName('projectData'):
+            name = (el.getAttribute('key') or '').strip('/')
+            if name and '.' in name:        # verse refs look like '1Tim.1.5'
+                verses.append(name)
+    return verses
+
+
 def list_verse_users(project_id, vref, session_hash):
     """Usernames that have decisions stored at this verse.
 
@@ -286,3 +301,53 @@ def editorial_save(vref):
         conn.close()
     put_verse(_project_id(), vref, fragment, me, sh)
     return make_json_response({'saved': True, 'verse': vref, 'user': me})
+
+
+def _refresh_all_worker(app, project_id, user_name, session_hash, user_id):
+    """Load every saved verse's decisions into the DB (for whole-project analysis)."""
+
+    import cbgm_import  # share its status dict so import_status.json shows progress
+    with app.app_context():
+        try:
+            verses = list_all_verses(project_id, session_hash)
+            total = len(verses)
+            cbgm_import._set(project_id, state='refreshing', done=0, total=total,
+                             message='loading decisions')
+            conn = app.config.dba.engine.raw_connection()
+            try:
+                for i, vref in enumerate(verses, 1):
+                    fragment = get_verse(project_id, vref, user_name, session_hash)
+                    if fragment:
+                        apply_verse(conn, fragment, user_id)
+                    cbgm_import._set(project_id, state='refreshing', done=i,
+                                     total=total, message=vref)
+            finally:
+                conn.close()
+            cbgm_import._set(project_id, state='done', done=total, total=total,
+                             message='decisions loaded')
+            log.info('Refreshed %d verses of decisions for project %s (%s)',
+                     total, project_id, user_name)
+        except Exception as e:  # pylint: disable=broad-except
+            log.exception('refresh-all failed for project %s', project_id)
+            cbgm_import._set(project_id, state='error', message=str(e))
+
+
+@bp.route('/editorial/refresh_all.json', methods=['POST', 'OPTIONS'])
+def editorial_refresh_all():
+    """Walk all saved verses and load each editor decision into the DB, so the
+    coherence/affinity analysis runs across the whole project."""
+
+    if request.method == 'OPTIONS':
+        return make_json_response({})
+    me = _current_user_name()
+    sh = getattr(flask_login.current_user, 'api_key', None)
+    uid = getattr(flask_login.current_user, 'id', 0)
+    pid = _project_id()
+    if not (me and sh and pid):
+        return make_json_response({'started': False, 'reason': 'not logged in'})
+    t = threading.Thread(
+        target=_refresh_all_worker,
+        args=(current_app._get_current_object(), pid, me, sh, uid),
+        daemon=True)
+    t.start()
+    return make_json_response({'started': True})

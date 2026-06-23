@@ -39,6 +39,12 @@
     <div class="container bs-docs-container">
       <h4>Your projects</h4>
       <br />
+      <input
+        ref="dump_input"
+        type="file"
+        style="display: none"
+        @change="dump_selected"
+      />
       <p v-if="!is_logged_in">
         <a :href="ntvmr_login_url">Log in</a> to see the projects you can work
         on.
@@ -65,41 +71,50 @@
             <td class="app_name">{{ p.name }}</td>
             <td>{{ p.object_part }}</td>
             <td>{{ p.user_group }}</td>
-            <td class="cbgm-action" style="min-width: 220px;">
-              <a
-                v-if="p.instance_root"
-                class="btn btn-sm btn-success"
-                :href="'/' + p.instance_root"
-                >Open</a
-              >
-              <span
-                v-else-if="importing(p)"
-                class="import-progress"
-              >
+            <td class="cbgm-action" style="min-width: 260px; position: relative;">
+              <span v-if="importing(p)" class="import-progress">
                 <span class="bar">
-                  <span
-                    class="fill"
-                    :style="{ width: percent(p) + '%' }"
-                  ></span>
+                  <span class="fill" :style="{ width: percent(p) + '%' }"></span>
                 </span>
                 {{ p.import.message }}
                 <template v-if="p.import.total"
                   >({{ p.import.done }}/{{ p.import.total }})</template
                 >
               </span>
-              <span v-else-if="done(p)">
-                Imported &mdash; reload the app to open
-              </span>
-              <span v-else-if="errored(p)" class="text-danger">
-                Error: {{ p.import.message }}
-              </span>
-              <button
-                v-else
-                class="btn btn-sm btn-primary"
-                @click="startCbgm(p)"
-              >
-                Start CBGM
-              </button>
+              <template v-else>
+                <a
+                  v-if="p.instance_root"
+                  class="btn btn-sm btn-success"
+                  :href="'/' + p.instance_root"
+                  >Open</a
+                >
+                <button
+                  v-else
+                  class="btn btn-sm btn-primary"
+                  @click="startCbgm(p)"
+                >
+                  Start CBGM
+                </button>
+                <span v-if="errored(p)" class="text-danger" style="margin-left:6px;">
+                  {{ p.import.message }}
+                </span>
+                <button
+                  class="btn btn-sm btn-light cbgm-more"
+                  title="More options"
+                  @click="toggle_menu(p)"
+                >
+                  &ctdot;
+                </button>
+                <div v-if="menu_open === p.project_id" class="cbgm-menu">
+                  <a @click="pick_dump(p)">Load from CBGM dump file&hellip;</a>
+                  <a v-if="p.instance_root" @click="reload_ntvmr(p)"
+                    >Reload from NTVMR</a
+                  >
+                  <a v-if="p.instance_root" @click="refresh_all(p)"
+                    >Refresh All Decisions</a
+                  >
+                </div>
+              </template>
             </td>
           </tr>
         </tbody>
@@ -248,7 +263,8 @@ export default {
       ECMActs: ECMActs,
       Docker: Docker,
       projects: [],
-      projects_loaded: false
+      projects_loaded: false,
+      menu_open: null
     };
   },
   computed: {
@@ -292,8 +308,72 @@ export default {
     importing: function(p) {
       return (
         p.import &&
-        (p.import.state === "provisioning" || p.import.state === "importing")
+        ["provisioning", "importing", "restoring", "refreshing"].indexOf(
+          p.import.state
+        ) !== -1
       );
+    },
+    toggle_menu: function(p) {
+      this.menu_open = this.menu_open === p.project_id ? null : p.project_id;
+    },
+    pick_dump: function(p) {
+      this._dump_project = p;
+      this.menu_open = null;
+      this.$refs.dump_input.click();
+    },
+    dump_selected: function(e) {
+      const vm = this;
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      const p = vm._dump_project;
+      if (!file || !p) return;
+      const fd = new FormData();
+      fd.append("dump", file);
+      fd.append("name", p.name);
+      fd.append("object_part", p.object_part || "");
+      vm.$set(p, "import", {
+        state: "provisioning",
+        message: "uploading dump",
+        done: 0,
+        total: 0
+      });
+      axios
+        .post(
+          url.resolve(
+            window.api_base_url,
+            "projects/" + p.project_id + "/load_dump.json"
+          ),
+          fd
+        )
+        .then(function() {
+          vm.ensure_polling();
+        })
+        .catch(function(err) {
+          vm.$set(p, "import", {
+            state: "error",
+            message: (err.response && err.response.statusText) || "upload failed"
+          });
+        });
+    },
+    reload_ntvmr: function(p) {
+      this.menu_open = null;
+      this.startCbgm(p); // re-runs the NTVMR import
+    },
+    refresh_all: function(p) {
+      const vm = this;
+      vm.menu_open = null;
+      if (!p.instance_root) return;
+      vm.$set(p, "import", {
+        state: "refreshing",
+        message: "loading decisions",
+        done: 0,
+        total: 0
+      });
+      axios
+        .post(url.resolve(window.api_base_url, p.instance_root + "editorial/refresh_all.json"))
+        .then(function() {
+          vm.ensure_polling();
+        });
     },
     done: function(p) {
       return p.import && p.import.state === "done";
@@ -376,6 +456,37 @@ export default {
 div.vm-project-list {
   .img-guide {
     height: 200px;
+  }
+
+  .cbgm-more {
+    margin-left: 6px;
+    font-weight: bold;
+    border: 1px solid #ccc;
+  }
+
+  .cbgm-menu {
+    position: absolute;
+    z-index: 20;
+    right: 8px;
+    margin-top: 4px;
+    min-width: 220px;
+    background: #fff;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    a {
+      display: block;
+      padding: 8px 12px;
+      cursor: pointer;
+      color: #222;
+      &:hover {
+        background: #f0f4f7;
+        text-decoration: none;
+      }
+      & + a {
+        border-top: 1px solid #eee;
+      }
+    }
   }
 
   .import-progress {
