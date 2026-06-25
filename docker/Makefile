@@ -41,19 +41,25 @@ TAG       ?= latest
 PLATFORMS ?= linux/amd64,linux/arm64
 APP_IMAGE := docker.io/$(NS)/cbgm-app-server:$(TAG)
 DB_IMAGE  := docker.io/$(NS)/cbgm-db-server:$(TAG)
+# Build into a DISTINCT local manifest-list name (…-mc), never the image name:
+# if the image name has been `podman pull`ed it already exists as a plain
+# image, and `build --manifest <that name>` then collides ("image is not a
+# manifest list" at push).  The -mc names are only ever manifest lists.
+APP_MANIFEST := cbgm-app-server-mc:$(TAG)
+DB_MANIFEST  := cbgm-db-server-mc:$(TAG)
 
 crosswire-login:
 	$(PODMAN) login docker.io
 
 crosswire-app: app-context
-	-$(PODMAN) manifest rm $(APP_IMAGE) 2>/dev/null
-	$(PODMAN) build --no-cache --platform $(PLATFORMS) --manifest $(APP_IMAGE) -f Dockerfile .
-	$(PODMAN) manifest push --all $(APP_IMAGE) docker://$(APP_IMAGE)
+	-$(PODMAN) manifest rm $(APP_MANIFEST) 2>/dev/null
+	$(PODMAN) build --no-cache --platform $(PLATFORMS) --manifest $(APP_MANIFEST) -f Dockerfile .
+	$(PODMAN) manifest push --all $(APP_MANIFEST) docker://$(APP_IMAGE)
 
 crosswire-db:
-	-$(PODMAN) manifest rm $(DB_IMAGE) 2>/dev/null
-	$(PODMAN) build --no-cache --platform $(PLATFORMS) --manifest $(DB_IMAGE) -f Dockerfile.db.empty .
-	$(PODMAN) manifest push --all $(DB_IMAGE) docker://$(DB_IMAGE)
+	-$(PODMAN) manifest rm $(DB_MANIFEST) 2>/dev/null
+	$(PODMAN) build --no-cache --platform $(PLATFORMS) --manifest $(DB_MANIFEST) -f Dockerfile.db.empty .
+	$(PODMAN) manifest push --all $(DB_MANIFEST) docker://$(DB_IMAGE)
 
 crosswire: crosswire-app crosswire-db
 
