@@ -325,6 +325,26 @@ if __name__ == "__main__":
     Config.CONFIG_FILE = args.config_file
     app = create_app(Config)
 
+    # werkzeug's startup banner prints the container's *internal* bind address
+    # (e.g. "Running on http://10.89.0.3:5000/"), which a user can't reach.
+    # In werkzeug 2.0.x that banner goes through the 'werkzeug' logger, so drop
+    # just those lines (request access-logs don't say "Running on") and print
+    # the real, host-facing URL ourselves instead.
+    class _DropWerkzeugBanner(logging.Filter):
+        def filter(self, record):  # noqa: A003
+            return 'Running on' not in record.getMessage()
+    logging.getLogger('werkzeug').addFilter(_DropWerkzeugBanner())
+
+    # CBGM_PUBLIC_URL is set by the published docker-compose to the host-mapped
+    # URL (e.g. http://localhost:8088).  Fall back to the container port for
+    # direct/dev runs.
+    public_url = os.environ.get('CBGM_PUBLIC_URL') \
+        or 'http://localhost:%s' % app.config['APPLICATION_PORT']
+    line = '*  Open  %s  in your browser.  *' % public_url
+    bar = '*' * len(line)
+    print('\n'.join(['', bar, '*%s*' % (' ' * (len(line) - 2)), line,
+                      '*%s*' % (' ' * (len(line) - 2)), bar, '']), flush=True)
+
     run_simple(
         app.config['APPLICATION_HOST'],
         app.config['APPLICATION_PORT'],

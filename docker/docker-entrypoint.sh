@@ -2,9 +2,7 @@
 set -e
 
 if [ "$1" = 'app-server' ]; then
-    echo "***********************************************"
-    echo "* Point your browser to http://localhost:5000 *"
-    echo "***********************************************"
+    echo "Starting CBGM app-server; the browse URL is printed below once ready."
     exec python3 -m server -vvv
 fi
 

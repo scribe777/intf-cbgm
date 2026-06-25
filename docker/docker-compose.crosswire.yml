@@ -27,6 +27,9 @@ services:
     ports:
       - "8088:5000"   # host:container — change the host side (8088) to taste
     environment:
+      # The URL the server tells users to open.  Keep the port in sync with the
+      # host side of the mapping above (8088).
+      CBGM_PUBLIC_URL: "http://localhost:8088"
       # The NTVMR this instance authenticates against and imports from.
       NTVMR_API_URL: "https://ntvmr.uni-muenster.de/community/vmr/api/"
       CBGM_SCHEMA_TEMPLATE_DB: "cbgm_template"
