@@ -1,22 +1,61 @@
-.PHONY: backup build clean run
+.PHONY: backup build clean run app-context \
+        crosswire crosswire-app crosswire-db crosswire-login
 
-build: Makefile
-	# build vue.js app via npm and make
-	# currently working with node v14.15.0 with npm v6.14.8 
-	# make sure to use correct package.json
+# Assemble the app build context: (re)build the Vue.js client and copy the
+# source trees into this directory (= the Docker build context).
+# Works with node v14.15.0 / npm v6.14.8.
+app-context: Makefile
 	rm -rf ../client/build
 	cd ../client && npm install
 	cd ../client && $(MAKE)
-	# copy all source folders to this folder to build docker image
+	# copy all source folders into this folder so the Dockerfile can COPY them
 	rm -rf client scripts server ntg_common
-	mkdir client
-	mkdir scripts	
+	mkdir client scripts
 	cp -a ../server ../ntg_common .
 	cp -a ../client/build/* ./client
 	cp -a ../scripts/cceh/* ./scripts
-	# we need two dockerfiles, one for the db and one for the server
+
+build: app-context
+	# single-arch local dev images (intf/*)
 	docker build -f Dockerfile.db --tag=intf/ntg-db-server  .
 	docker build -f Dockerfile    --tag=intf/ntg-app-server .
+
+# --------------------------------------------------------------------------- #
+# Multi-arch publish to Docker Hub (crosswire/*)
+#
+# Requires podman 5.x with qemu-user-static binfmt registered for arm64
+#   check:  ls /proc/sys/fs/binfmt_misc/qemu-aarch64
+# and being logged in to Docker Hub (`make crosswire-login`, user scribe777).
+#
+#   make crosswire        # build + push BOTH images, amd64 + arm64
+#   make crosswire-app    # just the app-server image
+#   make crosswire-db     # just the (data-less) db-server image
+#
+# --no-cache is deliberate: it sidesteps a podman COPY-layer cache bug that
+# can ship stale code into the pushed manifest.  Override defaults on the
+# command line, e.g.  make crosswire-app TAG=test PLATFORMS=linux/arm64
+# --------------------------------------------------------------------------- #
+PODMAN    ?= podman
+NS        ?= crosswire
+TAG       ?= latest
+PLATFORMS ?= linux/amd64,linux/arm64
+APP_IMAGE := docker.io/$(NS)/cbgm-app-server:$(TAG)
+DB_IMAGE  := docker.io/$(NS)/cbgm-db-server:$(TAG)
+
+crosswire-login:
+	$(PODMAN) login docker.io
+
+crosswire-app: app-context
+	-$(PODMAN) manifest rm $(APP_IMAGE) 2>/dev/null
+	$(PODMAN) build --no-cache --platform $(PLATFORMS) --manifest $(APP_IMAGE) -f Dockerfile .
+	$(PODMAN) manifest push --all $(APP_IMAGE) docker://$(APP_IMAGE)
+
+crosswire-db:
+	-$(PODMAN) manifest rm $(DB_IMAGE) 2>/dev/null
+	$(PODMAN) build --no-cache --platform $(PLATFORMS) --manifest $(DB_IMAGE) -f Dockerfile.db.empty .
+	$(PODMAN) manifest push --all $(DB_IMAGE) docker://$(DB_IMAGE)
+
+crosswire: crosswire-app crosswire-db
 
 # this command only works on a production server with a fully functional database
 # backup:
