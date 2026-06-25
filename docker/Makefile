@@ -14,6 +14,9 @@ app-context: Makefile
 	cp -a ../server ../ntg_common .
 	cp -a ../client/build/* ./client
 	cp -a ../scripts/cceh/* ./scripts
+	# the app imports ntvmrimport (NTVMR -> CBGM apparatus import driver),
+	# which lives in scripts/python, not scripts/cceh
+	cp -a ../scripts/python/ntvmrimport.py ./scripts
 
 build: app-context
 	# single-arch local dev images (intf/*)
