@@ -9,7 +9,8 @@ from flask import current_app
 import flask_login
 
 from helpers import make_json_response
-from login import user_can_read, user_can_write, ntvmr_service_request
+from login import (user_can_read, user_can_write, ntvmr_service_request,
+                   ntvmr_reachable)
 from cbgm_import import get_status
 
 bp = flask.Blueprint('info', __name__)
@@ -51,8 +52,14 @@ def projects_json():
     """
 
     user = flask_login.current_user
-    projects = []
-    if user.is_authenticated and getattr(user, 'api_key', None):
+    # Access is_authenticated FIRST: that resolves current_user, which runs the
+    # request loader, which records NTVMR reachability on flask.g.  Reading the
+    # flag before this would always see None (loader not yet run).
+    authed = bool(user.is_authenticated and getattr(user, 'api_key', None))
+    live = None
+    # Did the NTVMR answer during this request?  None means "not probed".
+    reachable = getattr(flask.g, 'ntvmr_reachable', None)
+    if authed:
         # Which projects already have a mounted CBGM instance (-> "Open")?
         mounted = {}
         for inst in instances.values():
@@ -70,10 +77,12 @@ def projects_json():
             user.api_key
         )
         if root is not None and root.tagName == 'userGroups':
+            reachable = True
+            live = []
             for ug in root.getElementsByTagName('userGroup'):
                 for p in ug.getElementsByTagName('project'):
                     pid = p.getAttribute('projectID')
-                    projects.append({
+                    live.append({
                         'project_id': pid,
                         'name': p.getAttribute('name'),
                         'object_part': p.getAttribute('objectPart'),
@@ -83,11 +92,74 @@ def projects_json():
                         'instance_root': mounted.get(str(pid)),
                         'import': get_status(pid),
                     })
+        elif root is None:
+            # The identity may have come from the session cache; the failed
+            # usergroup/get proves the NTVMR is unreachable right now.
+            reachable = False
 
+    if live is not None:
+        # Authoritative live list (an empty-but-reachable list stays empty).
+        return make_json_response({
+            'username': user.username, 'projects': _sort_projects(live),
+            'offline': False,
+        })
+
+    if reachable is None:
+        # No session cookie to probe with (e.g. a fresh / incognito window).
+        # Do a cheap, breaker-aware reachability check ourselves so an
+        # unauthenticated LOCAL session still reaches the projects loaded on
+        # this machine when offline -- they are this laptop's own local data.
+        reachable = ntvmr_reachable()
+
+    if reachable is False:
+        # Genuinely offline: fall back to the projects already loaded on this
+        # machine, each rebuilt from its instance .conf (identity/roles/metadata
+        # captured at import time; see cbgm_import).  These are openable and
+        # editable offline; sync resumes on reconnect.
+        return make_json_response({
+            'username': user.username if user.is_authenticated else 'anonymous',
+            'projects': _sort_projects(_projects_from_instances()),
+            'offline': True,
+        })
+
+    # Online (or reachability unknown) but no live list: not logged in, or a
+    # member of no projects.  Let the client prompt for login.
     return make_json_response({
         'username': user.username if user.is_authenticated else 'anonymous',
-        'projects': projects,
+        'projects': [],
+        'offline': False,
     })
+
+
+def _sort_projects(rows):
+    """Order the project list: loaded projects (a mounted instance, i.e. an
+    'Open' link) first, then alphabetically by project name."""
+    return sorted(rows, key=lambda p: (not p.get('instance_root'),
+                                       (p.get('name') or '').lower()))
+
+
+def _projects_from_instances():
+    """Build project rows from the locally mounted instances' .conf -- the
+    offline fallback when the NTVMR can't be reached for the live list."""
+
+    rows = []
+    for inst in instances.values():
+        c = inst.config
+        pid = c.get('NTVMR_PROJECT_ID')
+        if not pid:
+            continue
+        root_path = c.get('APPLICATION_DIR', c.get('APPLICATION_ROOT', ''))
+        rows.append({
+            'project_id': str(pid),
+            'name': c.get('NTVMR_PROJECT_NAME', c.get('APPLICATION_NAME', '')),
+            'object_part': c.get('BOOK', ''),
+            'task_type_id': c.get('NTVMR_TASK_TYPE_ID', ''),
+            'user_group': c.get('NTVMR_USER_GROUP', ''),
+            'user_group_id': c.get('NTVMR_USER_GROUP_ID', ''),
+            'instance_root': root_path.rstrip('/') + '/' if root_path else None,
+            'import': get_status(pid),
+        })
+    return rows
 
 
 @bp.route('/info.json')

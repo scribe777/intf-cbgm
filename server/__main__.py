@@ -103,6 +103,11 @@ class Config ():
     # (a global role does NOT satisfy it).  Empty disables the gate.
     # NTVMR project-scoped roles are 'Project '-prefixed by convention.
     CBGM_SAVE_ROLE = os.environ.get('CBGM_SAVE_ROLE', 'Project CBGM Editor')
+    # Seconds to cache a live auth/session/check result per session cookie, so
+    # identity isn't re-resolved against the NTVMR on every request.  Role
+    # freshness is unaffected (roles are checked live at save time).  0 disables
+    # the cache (resolve every request).
+    NTVMR_SESSION_CACHE_TTL = int(os.environ.get('NTVMR_SESSION_CACHE_TTL', '300'))
     # Where Start CBGM writes per-project instance confs.  Keep this OUT of the
     # baked instance/ dir so it can be a persistent volume without hiding
     # _global.conf.

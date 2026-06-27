@@ -271,7 +271,12 @@ def user_can_save(session_hash):
     if project:
         data['projectName'] = project
     root = login.ntvmr_service_request('auth/hasrole', data, session_hash)
-    return root is not None and root.getAttribute('hasRole') == 'true'
+    if root is not None:
+        # Reachable: authoritative (picks up role changes since import).
+        return root.getAttribute('hasRole') == 'true'
+    # Offline: fall back to the save role captured at import time.  A real
+    # save still has to reach the NTVMR, which remains the gate.
+    return role in login.imported_roles(current_app.config)
 
 
 def put_segment(project_id, ref, fragment, user_name, session_hash, push='false'):
@@ -593,7 +598,11 @@ def editorial_status():
         pending = list_pending(conn, me)
     finally:
         conn.close()
-    can = user_can_save(sh) if sh else False
+    # Don't shortcut to False when there's no session hash: user_can_save()
+    # itself does the right thing -- live auth/hasrole when reachable, and the
+    # .conf imported-roles fallback when offline (incl. a cookieless/incognito
+    # session served from the imported identity).
+    can = user_can_save(sh)
     return make_json_response({'pending': pending, 'count': len(pending),
                                'can_save': can, 'me': me})
 

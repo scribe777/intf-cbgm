@@ -1,9 +1,18 @@
 .PHONY: backup build clean run app-context \
         crosswire crosswire-app crosswire-db crosswire-login
 
+# Node >= 17 ships OpenSSL 3, which this (pinned, older) webpack's module
+# hashing rejects (ERR_OSSL_EVP_UNSUPPORTED).  Re-enable the legacy provider so
+# the client build works on a modern node.  The flag is REJECTED by node < 17,
+# so add it ONLY when needed -- the documented node v14 build keeps working.
+NODE_MAJOR := $(shell node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')
+ifeq ($(shell [ "$(NODE_MAJOR)" -ge 17 ] 2>/dev/null && echo 1),1)
+export NODE_OPTIONS := $(NODE_OPTIONS) --openssl-legacy-provider
+endif
+
 # Assemble the app build context: (re)build the Vue.js client and copy the
 # source trees into this directory (= the Docker build context).
-# Works with node v14.15.0 / npm v6.14.8.
+# Works with node v14.15.0 / npm v6.14.8 and with modern node (>=17; see above).
 app-context: Makefile
 	rm -rf ../client/build
 	cd ../client && npm install

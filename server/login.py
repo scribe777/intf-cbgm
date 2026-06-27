@@ -2,8 +2,11 @@
 
 """An application server for CBGM.  User management module.  """
 
+import concurrent.futures
 import logging
-import urllib
+import socket
+import time
+import urllib.parse
 from xml.dom import minidom
 
 import flask
@@ -163,23 +166,210 @@ def ntvmr_api_url ():
     return base.rstrip ('/') + '/'
 
 
+# Process-wide circuit breaker.  Once a call fails (e.g. offline), we assume the
+# NTVMR is down for a short window and short-circuit further calls to None
+# INSTANTLY -- otherwise every API request on a page would each block for the
+# full timeout, and the UI hangs for tens of seconds while offline.  After the
+# window we let one call through to probe for reconnection.
+_NTVMR_OFFLINE_TTL = 15          # seconds to assume-down after a failure
+_ntvmr_down_until = 0.0          # monotonic deadline; > now => skip, assume down
+
+# A tiny pool to bound DNS resolution.  requests' (connect, read) timeout does
+# NOT cover getaddrinfo, so offline a hostname lookup can hang ~10-15s before
+# failing.  We resolve in a worker with a hard wall-clock deadline; an orphaned
+# lookup finishes on its own and the breaker stops us from spawning many.
+_dns_pool = concurrent.futures.ThreadPoolExecutor (
+    max_workers = 4, thread_name_prefix = 'ntvmr-dns')
+
+
+def _resolves_within (host, seconds):
+    """True if `host` resolves within `seconds`; False if it times out / fails
+    (i.e. we are effectively offline).  Bounds DNS, which the socket/requests
+    timeouts do not."""
+    fut = _dns_pool.submit (socket.getaddrinfo, host, None)
+    try:
+        fut.result (timeout = seconds)
+        return True
+    except Exception:  # pylint: disable=broad-except
+        return False   # TimeoutError, or resolution error -> treat as offline
+
+
 def ntvmr_service_request (service, data, session_hash = None):
     """POST to an NTVMR API service and return the parsed XML root element.
 
-    Returns None on any error, so callers fall back to anonymous access rather
-    than blowing up if the NTVMR is unreachable.
+    Returns None on any error, so callers fall back to anonymous/offline
+    behaviour rather than blowing up if the NTVMR is unreachable.  A process
+    circuit breaker (see above) plus a bounded DNS lookup keep a whole offline
+    page from hanging.
     """
 
+    global _ntvmr_down_until
+    # Circuit open: skip the network entirely, fail fast.
+    if time.monotonic () < _ntvmr_down_until:
+        return None
     if session_hash:
         data = dict (data, sessionHash = session_hash)
     url = ntvmr_api_url () + service.strip ('/') + '/'
+    ttl = current_app.config.get ('NTVMR_OFFLINE_TTL', _NTVMR_OFFLINE_TTL)
+
+    # Bound DNS first -- this is the part that hangs ~13s offline.
+    host = urllib.parse.urlparse (url).hostname
+    dns_timeout = current_app.config.get ('NTVMR_DNS_TIMEOUT', 2)
+    if host and not _resolves_within (host, dns_timeout):
+        _ntvmr_down_until = time.monotonic () + ttl
+        log.warning ('NTVMR DNS for %s did not resolve in %ss; offline, '
+                     'skipping NTVMR for %ss', host, dns_timeout, ttl)
+        return None
+
+    # (connect, read): short connect keeps offline detection snappy; a longer
+    # read tolerates a slow-but-reachable NTVMR.
+    timeout = current_app.config.get ('NTVMR_TIMEOUT', (3.05, 10))
     try:
-        r = requests.post (url, data = data, timeout = 10,
+        r = requests.post (url, data = data, timeout = timeout,
                            headers = {'User-Agent': USER_AGENT})
+    except Exception as e:  # pylint: disable=broad-except
+        _ntvmr_down_until = time.monotonic () + ttl
+        log.warning ('NTVMR request to %s failed (%s); skipping NTVMR for %ss',
+                     url, e, ttl)
+        return None
+    _ntvmr_down_until = 0.0       # got a response -> NTVMR reachable again
+    try:
         return minidom.parseString (r.text.encode ('utf-8')).documentElement
     except Exception as e:  # pylint: disable=broad-except
-        log.warning ('NTVMR service request to %s failed: %s', url, e)
+        log.warning ('NTVMR response from %s unparseable: %s', url, e)
         return None
+
+
+def ntvmr_reachable ():
+    """Cheap, breaker-aware check: did the NTVMR answer at all right now?
+
+    Unlike ntvmr_service_request, ANY HTTP response (even an error or non-XML
+    body) counts as reachable -- we only care whether the host responded, not
+    what it said.  Used when there is no session cookie to probe with (a fresh /
+    incognito session) so an unauthenticated LOCAL session can still tell online
+    from offline.  Shares the circuit breaker + bounded DNS with the function
+    above.
+    """
+
+    global _ntvmr_down_until
+    if time.monotonic () < _ntvmr_down_until:
+        return False
+    ttl = current_app.config.get ('NTVMR_OFFLINE_TTL', _NTVMR_OFFLINE_TTL)
+    url = ntvmr_api_url () + 'auth/session/check/'
+    host = urllib.parse.urlparse (url).hostname
+    if host and not _resolves_within (
+            host, current_app.config.get ('NTVMR_DNS_TIMEOUT', 2)):
+        _ntvmr_down_until = time.monotonic () + ttl
+        return False
+    try:
+        requests.post (url, data = {},
+                       timeout = current_app.config.get ('NTVMR_TIMEOUT', (3.05, 10)),
+                       headers = {'User-Agent': USER_AGENT})
+    except Exception as e:  # pylint: disable=broad-except
+        _ntvmr_down_until = time.monotonic () + ttl
+        log.warning ('NTVMR reachability probe to %s failed (%s); offline', url, e)
+        return False
+    _ntvmr_down_until = 0.0
+    return True
+
+
+# --------------------------------------------------------------------------- #
+# Imported identity / roles (offline fallback)
+#
+# A CBGM project is typically a single user on their own laptop.  When the NTVMR
+# is reachable it is ALWAYS authoritative: the current ntvmrSession identity and
+# live role checks are used, so roles granted after the import take effect.
+# Only when the NTVMR is UNREACHABLE do we fall back to the importing user's
+# identity and project roles, captured into the instance .conf at import time
+# (see cbgm_import._capture_import_identity).  Either way the NTVMR stays the
+# gate: a real save is POSTed with the live session cookie and the NTVMR will
+# not let one user save as another.
+# --------------------------------------------------------------------------- #
+
+def resolved_project_roles (config, project_name = None):
+    """The role strings the tool checks for a project, exactly as sent to
+    ``auth/hasrole`` -- so the same set is produced at import (capture) and at
+    request (check) time.  ``CBGM_SAVE_ROLE`` is a full role name; the access
+    roles are ``<prefix><value>``.  'public' access needs no role."""
+
+    prefix = config.get ('NTVMR_ROLE_PREFIX', 'CBGM ')
+    roles = []
+    save_role = config.get ('CBGM_SAVE_ROLE') or ''
+    if save_role:
+        roles.append (save_role)
+    write_access = config.get (
+        'WRITE_ACCESS', config.get ('CBGM_PROJECT_WRITE_ACCESS', 'public'))
+    for access in (write_access,
+                   config.get ('READ_ACCESS_PRIVATE', 'Reviewer'),
+                   config.get ('READ_ACCESS', 'public')):
+        if access and access != 'public':
+            roles.append (prefix + access)
+    # de-dupe, preserve order
+    seen = set ()
+    return [r for r in roles if not (r in seen or seen.add (r))]
+
+
+def imported_roles (config):
+    """Set of project roles captured for the importing user (NTVMR_IMPORT_ROLES,
+    pipe-separated).  Empty set if none were captured."""
+
+    raw = config.get ('NTVMR_IMPORT_ROLES') or ''
+    return set (r for r in raw.split ('|') if r)
+
+
+def imported_identity (config):
+    """(user_id, user_name) captured at import for this instance, or None if the
+    config carries no imported identity (e.g. the root/project-list app)."""
+
+    uid  = config.get ('NTVMR_IMPORT_USER_ID')
+    name = config.get ('NTVMR_IMPORT_USER_NAME')
+    if uid and name and str (uid).isdigit ():
+        return (uid, name)
+    return None
+
+
+# Short-lived in-process cache of live auth/session/check results, keyed by the
+# ntvmrSession cookie value.  A cookie's identity is stable, so we resolve it
+# against the NTVMR at most once per NTVMR_SESSION_CACHE_TTL seconds instead of
+# on every request.  Only AUTHORITATIVE outcomes are cached (a valid user, or a
+# reachable rejection); an UNREACHABLE NTVMR is never cached, so we keep
+# retrying and fall back to the .conf identity meanwhile.  Not persisted -- a
+# restart just re-resolves; there is nothing to invalidate by hand.
+_session_cache = {}   # session_hash -> (expiry_monotonic, result)
+                      # result: ('user', user_id, user_name) | ('invalid',)
+
+
+def _check_session (session_hash):
+    """Resolve a session cookie to ``('user', id, name)``, ``('invalid',)``
+    (reachable but rejected) or ``('unreachable',)`` (NTVMR down), using the
+    short per-session cache to avoid an auth/session/check on every request."""
+
+    now = time.monotonic ()
+    hit = _session_cache.get (session_hash)
+    if hit and hit[0] > now:
+        return hit[1]
+
+    root = ntvmr_service_request ('auth/session/check', {}, session_hash)
+    if root is None:
+        # Unreachable: do NOT cache -- let the caller fall back to the .conf and
+        # retry next request (connectivity can return at any moment).
+        return ('unreachable',)
+
+    result = ('invalid',)
+    if root.tagName == 'user':
+        user_id   = root.getAttribute ('internalUserID')
+        user_name = root.getAttribute ('userName')
+        if user_id and user_name:
+            log.info ('NTVMR SSO: authenticated %s (id %s)', user_name, user_id)
+            result = ('user', user_id, user_name)
+
+    ttl = current_app.config.get ('NTVMR_SESSION_CACHE_TTL', 300)
+    if ttl > 0:
+        if len (_session_cache) > 256:   # opportunistic purge of expired entries
+            for k in [k for k, v in _session_cache.items () if v[0] <= now]:
+                del _session_cache[k]
+        _session_cache[session_hash] = (now + ttl, result)
+    return result
 
 
 class NtvmrUser (UserMixin):
@@ -190,11 +380,15 @@ class NtvmrUser (UserMixin):
     ``<NTVMR_ROLE_PREFIX><name>`` (default ``CBGM <name>``).
     """
 
-    def __init__ (self, session_hash, user_id, user_name):
+    def __init__ (self, session_hash, user_id, user_name, roles = None):
         self.api_key  = session_hash
         self.id       = int (user_id)
         self.username = user_name
-        self.roles    = []  # NTVMR roles are queried on demand via has_role()
+        self.roles    = []  # flask-login compat; real roles via has_role()
+        # Set ONLY on the offline fallback path (NTVMR unreachable): role checks
+        # then answer from the roles captured in the .conf at import.  None --
+        # the normal, reachable case -- means "ask the NTVMR live".
+        self.imported_roles = roles
 
     @property
     def is_active (self):
@@ -212,7 +406,12 @@ class NtvmrUser (UserMixin):
         return str (self.id)
 
     def has_role (self, *role_names):
-        prefix  = current_app.config.get ('NTVMR_ROLE_PREFIX', 'CBGM ')
+        prefix = current_app.config.get ('NTVMR_ROLE_PREFIX', 'CBGM ')
+        if self.imported_roles is not None:
+            # Offline fallback: answer from the roles captured at import.  The
+            # NTVMR still gates real saves once reachable.
+            return any (prefix + r in self.imported_roles for r in role_names)
+        # Reachable (normal case): ask the NTVMR live.
         project = current_app.config.get ('NTVMR_PROJECT_NAME')
         for role_name in role_names:
             data = { 'role' : prefix + role_name }
@@ -236,13 +435,31 @@ def register_request_loader (login_manager):
     def load_user_from_ntvmr (request):  # pylint: disable=unused-variable
         cookie_name  = current_app.config.get ('NTVMR_SESSION_COOKIE', 'ntvmrSession')
         session_hash = request.cookies.get (cookie_name)
-        if not session_hash:
-            return None
-        root = ntvmr_service_request ('auth/session/check', {}, session_hash)
-        if root is not None and root.tagName == 'user':
-            user_id   = root.getAttribute ('internalUserID')
-            user_name = root.getAttribute ('userName')
-            if user_id and user_name:
-                log.info ('NTVMR SSO: authenticated %s (id %s)', user_name, user_id)
-                return NtvmrUser (session_hash, user_id, user_name)
+
+        # NTVMR reachable -> always authoritative: use the CURRENT session's
+        # identity and live role checks (roles=None), so roles granted since the
+        # import take effect.  Identity is resolved through a short per-session
+        # cache (_check_session), so this is NOT a live call on every request.
+        # A reachable-but-invalid session is a real rejection (anonymous), not
+        # an excuse to fall back.
+        if session_hash:
+            result = _check_session (session_hash)
+            # Record whether the NTVMR answered this request, so views can tell
+            # "offline" apart from "simply not logged in" (flask.g is per-req).
+            flask.g.ntvmr_reachable = result[0] != 'unreachable'
+            if result[0] == 'user':
+                return NtvmrUser (session_hash, result[1], result[2])
+            if result[0] == 'invalid':
+                return None
+            # 'unreachable' -> NTVMR down; fall through to offline.
+
+        # Offline only (NTVMR unreachable, or no session cookie): if this is a
+        # project instance, fall back to the identity/roles captured in its
+        # .conf at import time.  The live cookie still rides along as api_key.
+        identity = imported_identity (current_app.config)
+        if identity:
+            log.info ('NTVMR offline: serving %s from imported .conf identity',
+                      identity[1])
+            return NtvmrUser (session_hash or '', identity[0], identity[1],
+                              roles = imported_roles (current_app.config))
         return None

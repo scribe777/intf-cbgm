@@ -45,15 +45,13 @@
         style="display: none"
         @change="dump_selected"
       />
-      <p v-if="!is_logged_in">
-        <a :href="ntvmr_login_url">Log in</a> to see the projects you can work
-        on.
-      </p>
-      <p v-else-if="projects_loaded && projects.length === 0">
-        You are not a member of any projects yet.
+      <p v-if="offline && projects.length" class="text-muted">
+        <em>Offline</em> &mdash; showing the projects already loaded on this
+        computer. <a :href="ntvmr_login_url">Log in</a> when you're back online
+        to see all the projects you can work on.
       </p>
       <table
-        v-else-if="projects.length"
+        v-if="projects.length"
         class="table table-bordered table-hover"
       >
         <tbody>
@@ -122,6 +120,20 @@
           </tr>
         </tbody>
       </table>
+      <p v-else-if="!projects_loaded" class="text-muted">
+        Loading your projects&hellip;
+      </p>
+      <p v-else-if="offline">
+        <em>Offline</em> &mdash; no CBGM projects are loaded on this computer
+        yet. Connect to the internet and log in to start one.
+      </p>
+      <p v-else-if="!is_logged_in">
+        <a :href="ntvmr_login_url">Log in</a> to see the projects you can work
+        on.
+      </p>
+      <p v-else>
+        You are not a member of any projects yet.
+      </p>
 
       <br /><br />
       <h4>
@@ -267,6 +279,7 @@ export default {
       Docker: Docker,
       projects: [],
       projects_loaded: false,
+      offline: false,
       menu_open: null
     };
   },
@@ -295,6 +308,7 @@ export default {
       .get(url.resolve(window.api_base_url, "projects.json"))
       .then(function(r) {
         vm.projects = r.data.data.projects || [];
+        vm.offline = !!r.data.data.offline;
         vm.projects_loaded = true;
         // If an import is already running (e.g. after a page reload), resume
         // polling so its progress keeps updating.
@@ -336,6 +350,9 @@ export default {
         fd.append("dump", file);
         fd.append("name", p.name);
         fd.append("object_part", p.object_part || "");
+        fd.append("task_type_id", p.task_type_id || "");
+        fd.append("user_group", p.user_group || "");
+        fd.append("user_group_id", p.user_group_id || "");
         if (force) fd.append("force", "true");
         vm.$set(p, "import", {
           state: "provisioning",
@@ -451,6 +468,9 @@ export default {
       const data = new URLSearchParams();
       data.append("object_part", p.object_part);
       data.append("name", p.name);
+      data.append("task_type_id", p.task_type_id || "");
+      data.append("user_group", p.user_group || "");
+      data.append("user_group_id", p.user_group_id || "");
       vm.$set(p, "import", {
         state: "provisioning",
         message: "queued",

@@ -26,6 +26,7 @@ import psycopg2
 
 import ntvmrimport  # /home/ntg/scripts (see Dockerfile PYTHONPATH)
 
+import login
 from helpers import make_json_response
 from ntg_common.exceptions import PrivilegeError
 
@@ -185,7 +186,58 @@ def _conf_path_for(cfg, dbname):
     return os.path.join(instance_dir, '%s.conf' % dbname)
 
 
-def _write_instance_conf(cfg, pid, name, dbname, object_part):
+def _conf_quote(val):
+    """Escape a value destined for a double-quoted .conf (pyfile) string."""
+    return str(val or '').replace('\\', '\\\\').replace('"', '\\"')
+
+
+def _meta_from_request():
+    """NTVMR usergroup/task metadata posted by the client's Start CBGM call,
+    persisted into the instance .conf for the offline project-table fallback."""
+    return {
+        'task_type_id': request.values.get('task_type_id', ''),
+        'user_group': request.values.get('user_group', ''),
+        'user_group_id': request.values.get('user_group_id', ''),
+    }
+
+
+def _capture_import_identity(name):
+    """Identity + project-relevant roles of the user performing the import.
+
+    Persisted into the .conf so the project keeps a usable login -- with the
+    permissions that user actually had -- when the NTVMR is unreachable.  Roles
+    are stored as the exact, project-scoped strings the tool checks against
+    (``login.resolved_project_roles``), pipe-separated; a real save still goes
+    to the NTVMR, which is the gate.
+    """
+
+    user = flask_login.current_user
+    sh = getattr(user, 'api_key', None)
+    granted = []
+    for role in login.resolved_project_roles(current_app.config, name):
+        data = {'role': role, 'projectName': name}
+        root = login.ntvmr_service_request('auth/hasrole', data, sh)
+        if root is not None and root.getAttribute('hasRole') == 'true':
+            granted.append(role)
+    return {
+        'import_user_id': str(getattr(user, 'id', '') or ''),
+        'import_user_name': getattr(user, 'username', '') or '',
+        'import_roles': '|'.join(granted),
+    }
+
+
+def _import_meta(name):
+    """Full instance-conf metadata for an import: client-posted usergroup/task
+    fields plus the captured importer identity/roles."""
+    meta = _meta_from_request()
+    meta.update(_capture_import_identity(name))
+    return meta
+
+
+def _write_instance_conf(cfg, pid, name, dbname, object_part,
+                         task_type_id='', user_group='', user_group_id='',
+                         import_user_id='', import_user_name='',
+                         import_roles=''):
     """Write an instance .conf so the tool can serve the imported project."""
 
     # Write to the persistable projects dir (kept separate from the baked
@@ -202,23 +254,42 @@ def _write_instance_conf(cfg, pid, name, dbname, object_part):
         'READ_ACCESS_PRIVATE="Reviewer"\n'
         'WRITE_ACCESS="%(write)s"\n'
         'NTVMR_PROJECT_ID="%(pid)s"\n'
-        'NTVMR_PROJECT_NAME="%(name)s"\n\n'
+        'NTVMR_PROJECT_NAME="%(name)s"\n'
+        # NTVMR usergroup/task metadata captured at import time so the project
+        # table can be rebuilt from local confs when the NTVMR is unreachable
+        # (offline).  See info.projects_json's offline fallback.
+        'NTVMR_TASK_TYPE_ID="%(task)s"\n'
+        'NTVMR_USER_GROUP="%(ug)s"\n'
+        'NTVMR_USER_GROUP_ID="%(ugid)s"\n'
+        # Identity + project roles of the user who performed the import, so the
+        # project keeps a usable login (with the right permissions) when the
+        # NTVMR is unreachable.  The NTVMR still gates any real save -- it will
+        # not let one user save as another -- so this is a fallback identity,
+        # not a grant.  See login.imported_identity / NtvmrUser.has_role.
+        'NTVMR_IMPORT_USER_ID="%(iuid)s"\n'
+        'NTVMR_IMPORT_USER_NAME="%(iuname)s"\n'
+        'NTVMR_IMPORT_ROLES="%(iroles)s"\n\n'
         'PGHOST="%(host)s"\n'
         'PGPORT="%(port)s"\n'
         'PGUSER="%(user)s"\n'
         'PGDATABASE="%(db)s"\n'
     ) % {
-        'name': name, 'root': app_root_for(pid), 'book': object_part,
-        'pid': pid, 'host': cfg['PGHOST'], 'port': cfg.get('PGPORT', 5432),
+        'name': _conf_quote(name), 'root': app_root_for(pid),
+        'book': object_part, 'pid': pid,
+        'host': cfg['PGHOST'], 'port': cfg.get('PGPORT', 5432),
         'user': cfg['PGUSER'], 'db': dbname,
         'write': cfg.get('CBGM_PROJECT_WRITE_ACCESS', 'public'),
+        'task': task_type_id, 'ug': _conf_quote(user_group),
+        'ugid': user_group_id,
+        'iuid': import_user_id, 'iuname': _conf_quote(import_user_name),
+        'iroles': _conf_quote(import_roles),
     }
     with open(path, 'w') as fp:
         fp.write(conf)
     return path
 
 
-def _worker(app, pid, object_part, name):
+def _worker(app, pid, object_part, name, meta=None):
     with app.app_context():
         cfg = current_app.config
         dbname = db_name_for(pid)
@@ -240,7 +311,8 @@ def _worker(app, pid, object_part, name):
             importer.import_project(object_part, progress=progress)
             conn.close()
 
-            conf_path = _write_instance_conf(cfg, pid, name, dbname, object_part)
+            conf_path = _write_instance_conf(cfg, pid, name, dbname,
+                                             object_part, **(meta or {}))
             # Mount the new instance into the running server so "Open" works
             # immediately (no restart).  Best-effort: if it fails the instance
             # still appears on the next app start.
@@ -258,7 +330,7 @@ def _worker(app, pid, object_part, name):
             _set(pid, state='error', message=str(e))
 
 
-def _worker_dump(app, pid, name, dump_path, object_part):
+def _worker_dump(app, pid, name, dump_path, object_part, meta=None):
     """Load an existing CBGM database from an uploaded dump (e.g. an ITSEE/old
     docker-image apparatus not present in the NTVMR)."""
 
@@ -281,7 +353,8 @@ def _worker_dump(app, pid, name, dump_path, object_part):
             finally:
                 conn.close()
 
-            conf_path = _write_instance_conf(cfg, pid, name, dbname, object_part)
+            conf_path = _write_instance_conf(cfg, pid, name, dbname,
+                                             object_part, **(meta or {}))
             try:
                 import __main__ as server_main
                 if hasattr(server_main, 'mount_instance'):
@@ -389,7 +462,8 @@ def load_dump(pid):
     _set(pid, state='provisioning', done=0, total=0, name=name, message='uploaded')
     t = threading.Thread(
         target=_worker_dump,
-        args=(current_app._get_current_object(), pid, name, tmp, object_part),
+        args=(current_app._get_current_object(), pid, name, tmp, object_part,
+              _import_meta(name)),
         daemon=True)
     t.start()
     return make_json_response({'started': True, 'status': get_status(pid)})
@@ -417,7 +491,8 @@ def start(pid):
          message='queued')
     t = threading.Thread(
         target=_worker,
-        args=(current_app._get_current_object(), pid, object_part, name),
+        args=(current_app._get_current_object(), pid, object_part, name,
+              _import_meta(name)),
         daemon=True)
     t.start()
     return make_json_response({'started': True, 'status': get_status(pid)})

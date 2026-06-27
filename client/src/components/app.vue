@@ -437,17 +437,39 @@ export default {
       }
     }
     if (!has_cookie && !tried && !returned_from_dance && window.ntvmr_api_url) {
-      try {
-        window.sessionStorage.setItem("ntvmr_sso_tried", "1");
-      } catch (e) {
-        /* noop */
-      }
-      const here = window.location.origin + window.location.pathname;
-      window.location.href =
-        window.ntvmr_api_url +
-        "auth/session/check/?r=" +
-        encodeURIComponent(here);
-      return; // navigating away; nothing more to do
+      // Probe the NTVMR before doing a *top-level* SSO redirect.  A navigation
+      // hangs forever when offline (blank screen, stuck on the NTVMR URL); a
+      // fetch fails fast.  Only bounce if the NTVMR is actually reachable --
+      // otherwise stay in the app and run offline.  See vmrcre/README.md.
+      const ctrl = new AbortController();
+      const timer = window.setTimeout(function() {
+        ctrl.abort();
+      }, 2500);
+      window
+        .fetch(window.ntvmr_api_url + "auth/session/check/", {
+          mode: "no-cors",
+          signal: ctrl.signal
+        })
+        .then(function() {
+          window.clearTimeout(timer);
+          // NTVMR reachable -> do the one-time SSO bounce (top-level redirect).
+          try {
+            window.sessionStorage.setItem("ntvmr_sso_tried", "1");
+          } catch (e) {
+            /* noop */
+          }
+          const here = window.location.origin + window.location.pathname;
+          window.location.href =
+            window.ntvmr_api_url +
+            "auth/session/check/?r=" +
+            encodeURIComponent(here);
+        })
+        .catch(function() {
+          window.clearTimeout(timer);
+          // Offline / NTVMR unreachable -> don't navigate away; run offline.
+          vm.refresh_session();
+        });
+      return; // either bouncing (reachable) or refreshing offline (catch)
     }
     vm.refresh_session();
   },
