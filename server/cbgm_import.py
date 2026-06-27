@@ -51,12 +51,23 @@ def get_status(pid=None):
         return dict(_status.get(str(pid), {}))
 
 
+def _safe_pid(pid):
+    """A project id is a numeric NTVMR projectID.  Refuse anything else so it
+    can never break out of a quoted SQL identifier (the CREATE/DROP DATABASE
+    DDL built from db_name_for) or a mount path.  Defense in depth: the HTTP
+    routes also constrain pid with the <int:pid> converter."""
+    s = str(pid)
+    if not s.isdigit():
+        raise ValueError('invalid project id: %r' % (pid,))
+    return s
+
+
 def db_name_for(pid):
-    return 'cbgm_proj_%s' % pid
+    return 'cbgm_proj_%s' % _safe_pid(pid)
 
 
 def app_root_for(pid):
-    return 'proj/%s' % pid
+    return 'proj/%s' % _safe_pid(pid)
 
 
 def _require_can_start(action):
@@ -106,6 +117,29 @@ def _pending_count(cfg, dbname):
         conn.close()
 
 
+def _decode(b):
+    """Decode captured subprocess stderr for an error/log message."""
+    if not b:
+        return ''
+    return b.decode('utf-8', 'replace').strip()
+
+
+def _assert_ntg_schema_populated(cfg, dbname):
+    """Fail loudly if a clone/restore left an empty ntg schema, so an import
+    never silently proceeds against a broken database."""
+    conn = _pg_connect(cfg, dbname, autocommit=True)
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT count(*) FROM information_schema.tables"
+                    " WHERE table_schema = 'ntg'")
+        if cur.fetchone()[0] == 0:
+            raise RuntimeError(
+                'database %s has an empty ntg schema after provisioning'
+                ' -- the schema clone/restore did not succeed' % dbname)
+    finally:
+        conn.close()
+
+
 def _provision(cfg, dbname):
     """Create the database and clone the (data-less) CBGM schema into it."""
 
@@ -128,14 +162,24 @@ def _provision(cfg, dbname):
                PGPORT=str(cfg.get('PGPORT', 5432)), PGUSER=cfg['PGUSER'])
     dump = subprocess.Popen(
         ['pg_dump', '--schema-only', '-n', 'ntg', template],
-        stdout=subprocess.PIPE, env=env)
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
     load = subprocess.Popen(
         ['psql', '-q', '-v', 'ON_ERROR_STOP=0', '-d', dbname],
         stdin=dump.stdout, stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL, env=env)
+        stderr=subprocess.PIPE, env=env)
     dump.stdout.close()
-    load.communicate()
+    _, load_err = load.communicate()
+    dump_err = dump.stderr.read()
+    dump.stderr.close()
     dump.wait()
+    # A failed pg_dump (e.g. missing template) pipes nothing -> an empty clone;
+    # check both ends rather than letting the import proceed against a broken DB.
+    if dump.returncode:
+        raise RuntimeError('pg_dump of schema template %r failed: %s'
+                           % (template, _decode(dump_err)))
+    if load.returncode:
+        raise RuntimeError('cloning schema into %s failed: %s'
+                           % (dbname, _decode(load_err)))
 
     conn = _pg_connect(cfg, dbname, autocommit=True)
     try:
@@ -143,6 +187,10 @@ def _provision(cfg, dbname):
             'ALTER DATABASE "%s" SET search_path = ntg, public' % dbname)
     finally:
         conn.close()
+
+    # ON_ERROR_STOP=0 means psql can exit 0 even if statements failed; verify the
+    # schema actually materialised so we never import into an empty database.
+    _assert_ntg_schema_populated(cfg, dbname)
 
 
 def _recreate_database(cfg, dbname):
@@ -173,9 +221,16 @@ def _pg_restore(cfg, dbname, dump_path):
     env = dict(os.environ, PGHOST=cfg['PGHOST'],
                PGPORT=str(cfg.get('PGPORT', 5432)), PGUSER=cfg['PGUSER'])
     # pg_restore returns non-zero on benign warnings; don't treat that as fatal.
-    subprocess.run(
+    # Log the detail, then verify the restore actually populated the schema --
+    # that post-condition, not the noisy exit code, is what tells a real failure
+    # (e.g. an empty/corrupt dump) from harmless warnings.
+    result = subprocess.run(
         ['pg_restore', '--no-owner', '-n', 'ntg', '-d', dbname, dump_path],
         env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    if result.returncode:
+        log.warning('pg_restore into %s exited %d: %s',
+                    dbname, result.returncode, _decode(result.stderr))
+    _assert_ntg_schema_populated(cfg, dbname)
 
 
 def _conf_path_for(cfg, dbname):
@@ -426,7 +481,7 @@ def _cbgm_worker(app, pid):
             _set(pid, state='error', message=str(e))
 
 
-@bp.route('/projects/<pid>/load_dump.json', methods=['POST', 'OPTIONS'])
+@bp.route('/projects/<int:pid>/load_dump.json', methods=['POST', 'OPTIONS'])
 def load_dump(pid):
     """Endpoint.  Load a project from an uploaded CBGM dump file."""
 
@@ -469,7 +524,7 @@ def load_dump(pid):
     return make_json_response({'started': True, 'status': get_status(pid)})
 
 
-@bp.route('/projects/<pid>/start.json', methods=['POST', 'OPTIONS'])
+@bp.route('/projects/<int:pid>/start.json', methods=['POST', 'OPTIONS'])
 def start(pid):
     """Endpoint.  Begin importing a project into a new CBGM database."""
 
@@ -498,7 +553,7 @@ def start(pid):
     return make_json_response({'started': True, 'status': get_status(pid)})
 
 
-@bp.route('/projects/<pid>/recompute.json', methods=['POST', 'OPTIONS'])
+@bp.route('/projects/<int:pid>/recompute.json', methods=['POST', 'OPTIONS'])
 def recompute(pid):
     """Endpoint.  Recompute coherence (the full cbgm pass) for a project."""
 

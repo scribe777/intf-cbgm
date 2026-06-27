@@ -417,6 +417,12 @@ export default {
         .post(url.resolve(window.api_base_url, p.instance_root + "editorial/refresh_all.json"))
         .then(function() {
           vm.ensure_polling();
+        })
+        .catch(function(e) {
+          vm.$set(p, "import", {
+            state: "error",
+            message: (e.response && e.response.statusText) || "refresh failed"
+          });
         });
     },
     recompute: function(p) {
@@ -537,6 +543,9 @@ export default {
               // (its instance is now mounted).
               vm.refresh_projects();
             }
+          })
+          .catch(function() {
+            // Transient poll failure: keep polling; the next tick retries.
           });
       }, 1500);
     },
@@ -546,6 +555,9 @@ export default {
         .get(url.resolve(window.api_base_url, "projects.json"))
         .then(function(r) {
           vm.projects = r.data.data.projects || [];
+        })
+        .catch(function() {
+          // Leave the current list in place on a transient fetch failure.
         });
     }
   }

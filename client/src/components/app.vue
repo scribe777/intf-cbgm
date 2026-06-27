@@ -386,11 +386,17 @@ export default {
       return Promise.all([
         axios.get(url.resolve(vm.api_base_url, "info.json")),
         axios.get(url.resolve(vm.api_base_url, "user.json"))
-      ]).then((responses) => {
-        vm.$store.commit("instances", responses[0].data.data.instances);
-        vm.$store.commit("current_user", responses[1].data.data);
-        return responses[1].data.data.username !== "anonymous";
-      });
+      ])
+        .then((responses) => {
+          vm.$store.commit("instances", responses[0].data.data.instances);
+          vm.$store.commit("current_user", responses[1].data.data);
+          return responses[1].data.data.username !== "anonymous";
+        })
+        .catch(() => {
+          // The local /api/ endpoints failed (server hiccup); keep whatever
+          // session state we have rather than throwing an unhandled rejection.
+          return false;
+        });
     }
   },
   created() {

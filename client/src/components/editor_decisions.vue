@@ -101,6 +101,10 @@ export default {
                     vm.loaded = who;
                     vm.$trigger ('epoch'); // reload stemma / coherence / apparatus
                 })
+                .catch (() => {
+                    // Load failed (e.g. offline): leave the current decisions
+                    // in place; busy is cleared below.
+                })
                 .finally (() => { vm.busy = false; });
         },
     },

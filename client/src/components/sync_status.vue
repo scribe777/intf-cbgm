@@ -97,6 +97,10 @@ export default {
                         vm.can_save = d.can_save;
                     }
                 })
+                .catch (() => {
+                    // Sync failed (e.g. offline): keep the queued edits and the
+                    // current count; the user can retry.  busy cleared below.
+                })
                 .finally (() => { vm.busy = false; });
         },
     },
