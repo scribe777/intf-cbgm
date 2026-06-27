@@ -62,7 +62,21 @@
             <th>User group</th>
             <th>CBGM</th>
           </tr>
-          <tr v-for="p of projects" :key="p.project_id">
+          <template v-for="g of grouped_projects">
+          <tr
+            v-if="grouped_projects.length > 1"
+            :key="'grp-' + g.id"
+            class="conn-group"
+          >
+            <td colspan="5">
+              <span class="conn-badge">{{ g.label }}</span>
+              <span v-if="!g.active" class="text-muted conn-note">
+                &mdash; read-only here; choose &ldquo;{{ g.label }}&rdquo; in
+                <em>Connect to&hellip;</em> to save back
+              </span>
+            </td>
+          </tr>
+          <tr v-for="p of g.projects" :key="row_key(p)">
             <td style="width:50px; text-align:center;">
               <i class="fas fa-folder-open" style="font-size: 20px;"></i>
             </td>
@@ -103,10 +117,10 @@
                 >
                   &ctdot;
                 </button>
-                <div v-if="menu_open === p.project_id" class="cbgm-menu">
+                <div v-if="menu_open === row_key(p)" class="cbgm-menu">
                   <a @click="pick_dump(p)">Load from CBGM dump file&hellip;</a>
                   <a v-if="p.instance_root" @click="reload_ntvmr(p)"
-                    >Reload from NTVMR</a
+                    >Reload from {{ p.connection_label || "NTVMR" }}</a
                   >
                   <a v-if="p.instance_root" @click="refresh_all(p)"
                     >Refresh All Decisions</a
@@ -118,6 +132,7 @@
               </template>
             </td>
           </tr>
+          </template>
         </tbody>
       </table>
       <p v-else-if="!projects_loaded" class="text-muted">
@@ -284,7 +299,31 @@ export default {
     };
   },
   computed: {
-    ...mapGetters(["is_logged_in"]),
+    ...mapGetters(["is_logged_in", "active_connection"]),
+    // Group the project list by source backend, active connection first.  See
+    // vmrcre/CONNECTIONS.md.
+    grouped_projects: function() {
+      const active_id = this.active_connection ? this.active_connection.id : null;
+      const index = {};
+      const groups = [];
+      for (const p of this.projects) {
+        const id = p.connection_id || "";
+        if (!(id in index)) {
+          index[id] = {
+            id: id,
+            label: p.connection_label || "VMRCRE",
+            active: id === active_id,
+            projects: []
+          };
+          groups.push(index[id]);
+        }
+        index[id].projects.push(p);
+      }
+      groups.sort((a, b) =>
+        a.active === b.active ? a.label.localeCompare(b.label) : a.active ? -1 : 1
+      );
+      return groups;
+    },
     ntvmr_login_url: function() {
       const api = window.ntvmr_api_url || "";
       let origin = "";
@@ -330,8 +369,14 @@ export default {
         ) !== -1
       );
     },
+    // A project id is only unique per backend, so key rows / the open menu by
+    // (connection, project).
+    row_key: function(p) {
+      return (p.connection_id || "") + ":" + p.project_id;
+    },
     toggle_menu: function(p) {
-      this.menu_open = this.menu_open === p.project_id ? null : p.project_id;
+      const k = this.row_key(p);
+      this.menu_open = this.menu_open === k ? null : k;
     },
     pick_dump: function(p) {
       this._dump_project = p;
@@ -570,6 +615,23 @@ export default {
 div.vm-project-list {
   .img-guide {
     height: 200px;
+  }
+
+  tr.conn-group td {
+    background-color: #eef1f3;
+    border-top: 2px solid #8c9598;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+  }
+  .conn-badge {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 0.9rem;
+  }
+  .conn-note {
+    margin-left: 0.5rem;
+    font-size: 0.85rem;
   }
 
   .cbgm-more {

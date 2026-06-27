@@ -56,11 +56,12 @@ def connections_json():
 
 @bp.route('/projects.json')
 def projects_json():
-    """Endpoint.  The NTVMR editorial projects belonging to the current user.
+    """Endpoint.  The user's projects, for the home page.
 
-    Proxies the NTVMR projectmanagement/project/list (server-side, with the
-    user's session) so the client gets the list same-origin.  See
-    vmrcre/README.md.
+    Always includes every locally-mounted CBGM project, tagged with the VMRCRE
+    backend it was imported from; when connected and online, overlays the active
+    backend's live editorial project list (proxied server-side with the user's
+    session).  The client groups them by connection.  See vmrcre/CONNECTIONS.md.
     """
 
     user = flask_login.current_user
@@ -68,19 +69,22 @@ def projects_json():
     # request loader, which records NTVMR reachability on flask.g.  Reading the
     # flag before this would always see None (loader not yet run).
     authed = bool(user.is_authenticated and getattr(user, 'api_key', None))
-    live = None
-    # Did the NTVMR answer during this request?  None means "not probed".
+    active = active_connection()
+    active_id = active.get('id') if active else None
+    # Did the active backend answer during this request?  None means "not probed".
     reachable = getattr(flask.g, 'ntvmr_reachable', None)
-    if authed:
-        # Which projects already have a mounted CBGM instance (-> "Open")?
-        mounted = {}
-        for inst in instances.values():
-            ppid = inst.config.get('NTVMR_PROJECT_ID')
-            if ppid:
-                root_path = inst.config.get(
-                    'APPLICATION_DIR', inst.config.get('APPLICATION_ROOT', ''))
-                mounted[str(ppid)] = root_path.rstrip('/') + '/'
 
+    # Every locally-mounted project, keyed by (backend, project), so a project
+    # imported from a non-active backend still shows (and can't collide with a
+    # same-numbered project from another backend).
+    by_key = {(r['connection_id'], r['project_id']): r
+              for r in _projects_from_instances()}
+
+    live_ok = False
+    if authed and active:
+        mounted_active = {pid: row['instance_root']
+                          for (cid, pid), row in by_key.items()
+                          if cid == active_id}
         # A user's projects come from the usergroups they belong to; each
         # usergroup carries its project.
         root = ntvmr_service_request(
@@ -90,56 +94,40 @@ def projects_json():
         )
         if root is not None and root.tagName == 'userGroups':
             reachable = True
-            live = []
+            live_ok = True
             for ug in root.getElementsByTagName('userGroup'):
                 for p in ug.getElementsByTagName('project'):
                     pid = p.getAttribute('projectID')
-                    live.append({
+                    by_key[(active_id, pid)] = {
                         'project_id': pid,
                         'name': p.getAttribute('name'),
                         'object_part': p.getAttribute('objectPart'),
                         'task_type_id': p.getAttribute('taskTypeID'),
                         'user_group': ug.getAttribute('name'),
                         'user_group_id': ug.getAttribute('userGroupID'),
-                        'instance_root': mounted.get(str(pid)),
+                        'instance_root': mounted_active.get(pid),
                         'import': get_status(pid),
-                    })
+                        'connection_id': active_id,
+                        'connection_label': active.get('label'),
+                    }
         elif root is None:
             # The identity may have come from the session cache; the failed
-            # usergroup/get proves the NTVMR is unreachable right now.
+            # usergroup/get proves the active backend is unreachable right now.
             reachable = False
 
-    if live is not None:
-        # Authoritative live list (an empty-but-reachable list stays empty).
-        return make_json_response({
-            'username': user.username, 'projects': _sort_projects(live),
-            'offline': False,
-        })
-
-    if reachable is None:
-        # No session cookie to probe with (e.g. a fresh / incognito window).
-        # Do a cheap, breaker-aware reachability check ourselves so an
-        # unauthenticated LOCAL session still reaches the projects loaded on
-        # this machine when offline -- they are this laptop's own local data.
+    # "offline" = we ARE connected to a backend but couldn't reach it now (the
+    # banner cue).  Standalone (no active connection) is not "offline".
+    if reachable is None and active and not live_ok:
+        # No session cookie to probe with (a fresh / incognito window); a cheap,
+        # breaker-aware check so the banner is right.
         reachable = ntvmr_reachable()
+    offline = bool(active) and reachable is False
 
-    if reachable is False:
-        # Genuinely offline: fall back to the projects already loaded on this
-        # machine, each rebuilt from its instance .conf (identity/roles/metadata
-        # captured at import time; see cbgm_import).  These are openable and
-        # editable offline; sync resumes on reconnect.
-        return make_json_response({
-            'username': user.username if user.is_authenticated else 'anonymous',
-            'projects': _sort_projects(_projects_from_instances()),
-            'offline': True,
-        })
-
-    # Online (or reachability unknown) but no live list: not logged in, or a
-    # member of no projects.  Let the client prompt for login.
     return make_json_response({
         'username': user.username if user.is_authenticated else 'anonymous',
-        'projects': [],
-        'offline': False,
+        'projects': _sort_projects(list(by_key.values())),
+        'offline': offline,
+        'active_connection': active_id,
     })
 
 
@@ -151,15 +139,21 @@ def _sort_projects(rows):
 
 
 def _projects_from_instances():
-    """Build project rows from the locally mounted instances' .conf -- the
-    offline fallback when the NTVMR can't be reached for the live list."""
+    """Build project rows from the locally mounted instances' .conf, each tagged
+    with the VMRCRE backend it was imported from (CONNECTION_ID; see
+    vmrcre/CONNECTIONS.md).  This is the always-present base of the project list,
+    and the whole list when offline."""
 
+    reg = {c.get('id'): c for c in connections(current_app.config)}
     rows = []
     for inst in instances.values():
         c = inst.config
         pid = c.get('NTVMR_PROJECT_ID')
         if not pid:
             continue
+        cid = c.get('CONNECTION_ID') or ''
+        # Legacy imports predate CONNECTION_ID; they were all NTVMR.
+        label = (reg.get(cid) or {}).get('label') or ('NTVMR' if not cid else cid)
         root_path = c.get('APPLICATION_DIR', c.get('APPLICATION_ROOT', ''))
         rows.append({
             'project_id': str(pid),
@@ -170,6 +164,8 @@ def _projects_from_instances():
             'user_group_id': c.get('NTVMR_USER_GROUP_ID', ''),
             'instance_root': root_path.rstrip('/') + '/' if root_path else None,
             'import': get_status(pid),
+            'connection_id': cid,
+            'connection_label': label,
         })
     return rows
 
