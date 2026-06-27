@@ -196,6 +196,10 @@ const store = new Vuex.Store({
     api_url: "",
     instances: [],
     ranges: [],
+    // Selectable VMRCRE backends ("Connect to..." menu) and the active one's id.
+    // See vmrcre/CONNECTIONS.md.
+    connections: [],
+    active_connection_id: null,
     current_application: {
       ...default_application
     },
@@ -207,6 +211,10 @@ const store = new Vuex.Store({
   mutations: {
     instances(state, data) {
       state.instances = data;
+    },
+    connections(state, data) {
+      state.connections = (data && data.connections) || [];
+      state.active_connection_id = (data && data.active) || null;
     },
     api_url(state, data) {
       state.api_url = data;
@@ -234,6 +242,10 @@ const store = new Vuex.Store({
   },
   getters: {
     api_url: (state) => state.api_url,
+    connections: (state) => state.connections,
+    active_connection: (state) =>
+      state.connections.find((c) => c.id === state.active_connection_id) ||
+      null,
     route_meta: (state) => state.route_meta,
     ranges: (state) => state.ranges,
     current_application: (state) => state.current_application,
@@ -397,9 +409,27 @@ export default {
           // session state we have rather than throwing an unhandled rejection.
           return false;
         });
+    },
+    // Load the VMRCRE connection registry + active connection (a LOCAL endpoint,
+    // so it works offline too) and point window.ntvmr_api_url at the active
+    // backend for the SSO handshake.  No active connection => standalone (no
+    // SSO).  See vmrcre/CONNECTIONS.md.
+    load_connections() {
+      const vm = this;
+      return axios
+        .get(url.resolve(vm.api_base_url, "connections.json"))
+        .then((r) => {
+          const d = (r.data && r.data.data) || r.data || {};
+          vm.$store.commit("connections", d);
+          const active = vm.$store.getters.active_connection;
+          window.ntvmr_api_url = active ? active.api_url : "";
+        })
+        .catch(() => {
+          // Keep the api.conf.js fallback already in window.ntvmr_api_url.
+        });
     }
   },
-  created() {
+  async created() {
     const vm = this;
     // NTVMR single sign-on: if we just returned from the NTVMR login redirect
     // (auth/session/check?r=...), it appended ?vmrcreSession=<hash>.  Capture
@@ -421,6 +451,9 @@ export default {
         window.location.pathname + (qs ? "?" + qs : "") + window.location.hash
       );
     }
+    // Resolve the active VMRCRE backend (sets window.ntvmr_api_url) BEFORE the
+    // SSO gate below, which keys off it.  No active connection => standalone.
+    await vm.load_connections();
     // Automatic single sign-on.  If we have no session yet, bounce once through
     // the NTVMR -- a *top-level* redirect, so the browser sends the NTVMR
     // session cookie (a hidden iframe can't: it's third-party).  If the user is
