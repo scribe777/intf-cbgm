@@ -159,10 +159,75 @@ def after_login ():
 # (a shared cookie) for identity and delegates role checks to the NTVMR.
 #
 
-def ntvmr_api_url ():
-    """ Return the NTVMR API base url, with a trailing slash. """
+def _site_from_api (api_url):
+    """Derive a VMRCRE instance's site root from its API base url."""
+    p = urllib.parse.urlparse (api_url or '')
+    if p.scheme and p.netloc:
+        return '%s://%s/' % (p.scheme, p.netloc)
+    return api_url or ''
 
-    base = current_app.config.get ('NTVMR_API_URL', DEFAULT_NTVMR_API_URL)
+
+def connections (config):
+    """The configured VMRCRE backends (see vmrcre/CONNECTIONS.md).
+
+    A deployment with only the legacy NTVMR_API_URL set (no CBGM_CONNECTIONS)
+    synthesises a single 'ntvmr' connection from it, so existing single-backend
+    installs keep working unchanged.
+    """
+    conns = config.get ('CBGM_CONNECTIONS')
+    if conns:
+        return conns
+    url = config.get ('NTVMR_API_URL', DEFAULT_NTVMR_API_URL)
+    return [{'id': 'ntvmr', 'label': config.get ('NTVMR_PROJECT_NAME') or 'NTVMR',
+             'api_url': url, 'site_url': _site_from_api (url)}]
+
+
+def connection_by_id (config, conn_id):
+    """The connection record with this id, or None."""
+    if not conn_id:
+        return None
+    for c in connections (config):
+        if c.get ('id') == conn_id:
+            return c
+    return None
+
+
+def active_connection ():
+    """The VMRCRE backend in effect for the current request, or None (standalone).
+
+    1. A project instance app is BOUND to the backend it was imported from
+       (its .conf CONNECTION_ID / NTVMR_API_URL), regardless of the active pick.
+    2. The root/info app uses the user's selection (the cbgmConnection cookie),
+       else the configured default (CBGM_DEFAULT_CONNECTION; '' => standalone).
+    """
+    config = current_app.config
+
+    # (1) Instance app: NTVMR_PROJECT_ID is only ever set on imported-project
+    # confs, so it tells an instance app from the root app.
+    if config.get ('NTVMR_PROJECT_ID'):
+        c = connection_by_id (config, config.get ('CONNECTION_ID'))
+        if c:
+            return c
+        # Legacy import (no CONNECTION_ID): synthesise from its own backend url.
+        url = config.get ('NTVMR_API_URL', DEFAULT_NTVMR_API_URL)
+        return {'id': config.get ('CONNECTION_ID', '') or '',
+                'label': config.get ('NTVMR_PROJECT_NAME') or 'NTVMR',
+                'api_url': url, 'site_url': _site_from_api (url)}
+
+    # (2) Root/info app: the user's selection, else the configured default.
+    conn_id = None
+    if flask.has_request_context ():
+        conn_id = flask.request.cookies.get ('cbgmConnection')
+    conn_id = conn_id or config.get ('CBGM_DEFAULT_CONNECTION', '')
+    return connection_by_id (config, conn_id)
+
+
+def ntvmr_api_url ():
+    """ Return the active backend's API base url, with a trailing slash. """
+
+    conn = active_connection ()
+    base = (conn['api_url'] if conn
+            else current_app.config.get ('NTVMR_API_URL')) or DEFAULT_NTVMR_API_URL
     return base.rstrip ('/') + '/'
 
 

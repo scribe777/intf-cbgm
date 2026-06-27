@@ -18,6 +18,7 @@ To start the server go to the parent directory and say::
 import argparse
 import collections
 import glob
+import json
 import logging
 import os
 import os.path
@@ -83,6 +84,24 @@ class Config ():
     # the compose file).  See vmrcre/README.md.
     NTVMR_API_URL = os.environ.get(
         'NTVMR_API_URL', 'https://ntvmr.uni-muenster.de/community/vmr/api/')
+    # Selectable VMRCRE backends for the "Connect to..." menu (see
+    # vmrcre/CONNECTIONS.md).  A list of {id, label, api_url, site_url}; override
+    # the whole list via the CBGM_CONNECTIONS env var (JSON).  A deployment with
+    # only the legacy NTVMR_API_URL set (no list) synthesises a single 'ntvmr'
+    # connection from it, so existing single-backend installs are unchanged.
+    CBGM_CONNECTIONS = json.loads(os.environ['CBGM_CONNECTIONS']) if os.environ.get(
+        'CBGM_CONNECTIONS') else [
+        {'id': 'ntvmr', 'label': 'NTVMR',
+         'api_url': NTVMR_API_URL,
+         'site_url': 'https://ntvmr.uni-muenster.de/'},
+        {'id': 'coptot', 'label': 'CoptOT',
+         'api_url': 'https://coptot.manuscriptroom.com/community/vmr/api/',
+         'site_url': 'https://coptot.manuscriptroom.com/'},
+    ]
+    # The connection that is active before the user picks one.  '' starts
+    # standalone (vanilla CBGM, no SSO) -- the toggle for an upstream build.
+    # Base ships 'ntvmr' so our hosted behaviour is unchanged.
+    CBGM_DEFAULT_CONNECTION = os.environ.get('CBGM_DEFAULT_CONNECTION', 'ntvmr')
     NTVMR_SESSION_COOKIE = os.environ.get('NTVMR_SESSION_COOKIE', 'ntvmrSession')
     NTVMR_ROLE_PREFIX = os.environ.get('NTVMR_ROLE_PREFIX', 'CBGM ')
     NTVMR_PROJECT_NAME = None

@@ -246,6 +246,16 @@ def _conf_quote(val):
     return str(val or '').replace('\\', '\\\\').replace('"', '\\"')
 
 
+def _connection_conf_block(connection_id, connection_api_url):
+    """The .conf lines binding a project to the backend it was imported from.
+    NTVMR_API_URL is only written when known, so we never override the inherited
+    default with an empty string."""
+    block = 'CONNECTION_ID="%s"\n' % _conf_quote(connection_id)
+    if connection_api_url:
+        block += 'NTVMR_API_URL="%s"\n' % _conf_quote(connection_api_url)
+    return block
+
+
 def _meta_from_request():
     """NTVMR usergroup/task metadata posted by the client's Start CBGM call,
     persisted into the instance .conf for the offline project-table fallback."""
@@ -281,18 +291,30 @@ def _capture_import_identity(name):
     }
 
 
+def _capture_connection():
+    """The VMRCRE backend this project is being imported from, so the project's
+    instance app stays bound to it regardless of the active connection later.
+    See vmrcre/CONNECTIONS.md."""
+    conn = login.active_connection() or {}
+    return {
+        'connection_id': conn.get('id', ''),
+        'connection_api_url': conn.get('api_url', ''),
+    }
+
+
 def _import_meta(name):
     """Full instance-conf metadata for an import: client-posted usergroup/task
-    fields plus the captured importer identity/roles."""
+    fields, the captured importer identity/roles, and the source connection."""
     meta = _meta_from_request()
     meta.update(_capture_import_identity(name))
+    meta.update(_capture_connection())
     return meta
 
 
 def _write_instance_conf(cfg, pid, name, dbname, object_part,
                          task_type_id='', user_group='', user_group_id='',
                          import_user_id='', import_user_name='',
-                         import_roles=''):
+                         import_roles='', connection_id='', connection_api_url=''):
     """Write an instance .conf so the tool can serve the imported project."""
 
     # Write to the persistable projects dir (kept separate from the baked
@@ -323,7 +345,12 @@ def _write_instance_conf(cfg, pid, name, dbname, object_part,
         # not a grant.  See login.imported_identity / NtvmrUser.has_role.
         'NTVMR_IMPORT_USER_ID="%(iuid)s"\n'
         'NTVMR_IMPORT_USER_NAME="%(iuname)s"\n'
-        'NTVMR_IMPORT_ROLES="%(iroles)s"\n\n'
+        'NTVMR_IMPORT_ROLES="%(iroles)s"\n'
+        # The VMRCRE backend this project was imported from.  The instance app
+        # stays bound to it (its api_url) regardless of the active "Connect
+        # to..." selection, so saves go to the right backend.  See
+        # vmrcre/CONNECTIONS.md.
+        '%(connblock)s\n'
         'PGHOST="%(host)s"\n'
         'PGPORT="%(port)s"\n'
         'PGUSER="%(user)s"\n'
@@ -338,6 +365,7 @@ def _write_instance_conf(cfg, pid, name, dbname, object_part,
         'ugid': user_group_id,
         'iuid': import_user_id, 'iuname': _conf_quote(import_user_name),
         'iroles': _conf_quote(import_roles),
+        'connblock': _connection_conf_block(connection_id, connection_api_url),
     }
     with open(path, 'w') as fp:
         fp.write(conf)

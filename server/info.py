@@ -10,7 +10,7 @@ import flask_login
 
 from helpers import make_json_response
 from login import (user_can_read, user_can_write, ntvmr_service_request,
-                   ntvmr_reachable)
+                   ntvmr_reachable, connections, active_connection)
 from cbgm_import import get_status
 
 bp = flask.Blueprint('info', __name__)
@@ -39,6 +39,18 @@ def user_json():
         'username': user.username if logged_in else 'anonymous',
         'roles': roles,
         'can_login': current_app.config['AFTER_LOGIN_URL'] is not None
+    })
+
+
+@bp.route('/connections.json')
+def connections_json():
+    """Endpoint.  The selectable VMRCRE backends and which one is active, for
+    the client's "Connect to..." menu.  See vmrcre/CONNECTIONS.md."""
+
+    active = active_connection()
+    return make_json_response({
+        'connections': connections(current_app.config),
+        'active': active.get('id') if active else None,
     })
 
 
