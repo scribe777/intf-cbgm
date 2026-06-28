@@ -24,9 +24,9 @@ bp = flask.Blueprint ('login', __name__)
 
 log = logging.getLogger (__name__)
 
-# Fallback used if no NTVMR_* config is present.  Real values come from the
+# Fallback used if no VMRCRE_* config is present.  Real values come from the
 # instance config; see vmrcre/README.md.
-DEFAULT_NTVMR_API_URL = 'https://ntvmr.uni-muenster.de/community/vmr/api/'
+DEFAULT_VMRCRE_API_URL = 'https://ntvmr.uni-muenster.de/community/vmr/api/'
 
 # Identify ourselves.  The NTVMR's fail2ban bans the default 'python-requests'
 # User-Agent, so we must send a real one or the app server gets jailed.
@@ -170,15 +170,15 @@ def _site_from_api (api_url):
 def connections (config):
     """The configured VMRCRE backends (see vmrcre/CONNECTIONS.md).
 
-    A deployment with only the legacy NTVMR_API_URL set (no CBGM_CONNECTIONS)
+    A deployment with only the legacy VMRCRE_API_URL set (no CBGM_CONNECTIONS)
     synthesises a single 'ntvmr' connection from it, so existing single-backend
     installs keep working unchanged.
     """
     conns = config.get ('CBGM_CONNECTIONS')
     if conns:
         return conns
-    url = config.get ('NTVMR_API_URL', DEFAULT_NTVMR_API_URL)
-    return [{'id': 'ntvmr', 'label': config.get ('NTVMR_PROJECT_NAME') or 'NTVMR',
+    url = config.get ('VMRCRE_API_URL', DEFAULT_VMRCRE_API_URL)
+    return [{'id': 'ntvmr', 'label': config.get ('VMRCRE_PROJECT_NAME') or 'NTVMR',
              'api_url': url, 'site_url': _site_from_api (url)}]
 
 
@@ -196,38 +196,57 @@ def active_connection ():
     """The VMRCRE backend in effect for the current request, or None (standalone).
 
     1. A project instance app is BOUND to the backend it was imported from
-       (its .conf CONNECTION_ID / NTVMR_API_URL), regardless of the active pick.
+       (its .conf CONNECTION_ID / VMRCRE_API_URL), regardless of the active pick.
     2. The root/info app uses the user's selection (the cbgmConnection cookie),
        else the configured default (CBGM_DEFAULT_CONNECTION; '' => standalone).
     """
     config = current_app.config
 
-    # (1) Instance app: NTVMR_PROJECT_ID is only ever set on imported-project
+    # (1) Instance app: VMRCRE_PROJECT_ID is only ever set on imported-project
     # confs, so it tells an instance app from the root app.
-    if config.get ('NTVMR_PROJECT_ID'):
+    if config.get ('VMRCRE_PROJECT_ID'):
         c = connection_by_id (config, config.get ('CONNECTION_ID'))
         if c:
             return c
         # Legacy import (no CONNECTION_ID): synthesise from its own backend url.
-        url = config.get ('NTVMR_API_URL', DEFAULT_NTVMR_API_URL)
+        url = config.get ('VMRCRE_API_URL', DEFAULT_VMRCRE_API_URL)
         return {'id': config.get ('CONNECTION_ID', '') or '',
-                'label': config.get ('NTVMR_PROJECT_NAME') or 'NTVMR',
+                'label': config.get ('VMRCRE_PROJECT_NAME') or 'NTVMR',
                 'api_url': url, 'site_url': _site_from_api (url)}
 
     # (2) Root/info app: the user's selection, else the configured default.
+    return connection_by_id (config, selected_connection_id ())
+
+
+def selected_connection_id ():
+    """The connection id the user currently has selected: the cbgmConnection
+    cookie, else the configured default (CBGM_DEFAULT_CONNECTION).  This is the
+    root-app notion of "which backend am I connected to right now"."""
     conn_id = None
     if flask.has_request_context ():
         conn_id = flask.request.cookies.get ('cbgmConnection')
-    conn_id = conn_id or config.get ('CBGM_DEFAULT_CONNECTION', '')
-    return connection_by_id (config, conn_id)
+    return conn_id or current_app.config.get ('CBGM_DEFAULT_CONNECTION', '')
 
 
-def ntvmr_api_url ():
+def instance_is_active ():
+    """For a project instance app: True if its bound backend is the one the user
+    is currently connected to.  When it is NOT, a save to the VMRCRE won't
+    authenticate (the session belongs to a different backend), so the editor
+    shows "reconnect to <backend> to save".  See vmrcre/CONNECTIONS.md."""
+    bound = current_app.config.get ('CONNECTION_ID', '') or ''
+    sel = selected_connection_id ()
+    if bound == sel:
+        return True
+    # A legacy instance (no CONNECTION_ID) is implicitly the NTVMR backend.
+    return not bound and sel in ('', 'ntvmr')
+
+
+def vmrcre_api_url ():
     """ Return the active backend's API base url, with a trailing slash. """
 
     conn = active_connection ()
     base = (conn['api_url'] if conn
-            else current_app.config.get ('NTVMR_API_URL')) or DEFAULT_NTVMR_API_URL
+            else current_app.config.get ('VMRCRE_API_URL')) or DEFAULT_VMRCRE_API_URL
     return base.rstrip ('/') + '/'
 
 
@@ -236,8 +255,8 @@ def ntvmr_api_url ():
 # INSTANTLY -- otherwise every API request on a page would each block for the
 # full timeout, and the UI hangs for tens of seconds while offline.  After the
 # window we let one call through to probe for reconnection.
-_NTVMR_OFFLINE_TTL = 15          # seconds to assume-down after a failure
-_ntvmr_down_until = 0.0          # monotonic deadline; > now => skip, assume down
+_VMRCRE_OFFLINE_TTL = 15          # seconds to assume-down after a failure
+_vmrcre_down_until = 0.0          # monotonic deadline; > now => skip, assume down
 
 # A tiny pool to bound DNS resolution.  requests' (connect, read) timeout does
 # NOT cover getaddrinfo, so offline a hostname lookup can hang ~10-15s before
@@ -259,7 +278,7 @@ def _resolves_within (host, seconds):
         return False   # TimeoutError, or resolution error -> treat as offline
 
 
-def ntvmr_service_request (service, data, session_hash = None):
+def vmrcre_service_request (service, data, session_hash = None):
     """POST to an NTVMR API service and return the parsed XML root element.
 
     Returns None on any error, so callers fall back to anonymous/offline
@@ -268,36 +287,36 @@ def ntvmr_service_request (service, data, session_hash = None):
     page from hanging.
     """
 
-    global _ntvmr_down_until
+    global _vmrcre_down_until
     # Circuit open: skip the network entirely, fail fast.
-    if time.monotonic () < _ntvmr_down_until:
+    if time.monotonic () < _vmrcre_down_until:
         return None
     if session_hash:
         data = dict (data, sessionHash = session_hash)
-    url = ntvmr_api_url () + service.strip ('/') + '/'
-    ttl = current_app.config.get ('NTVMR_OFFLINE_TTL', _NTVMR_OFFLINE_TTL)
+    url = vmrcre_api_url () + service.strip ('/') + '/'
+    ttl = current_app.config.get ('VMRCRE_OFFLINE_TTL', _VMRCRE_OFFLINE_TTL)
 
     # Bound DNS first -- this is the part that hangs ~13s offline.
     host = urllib.parse.urlparse (url).hostname
-    dns_timeout = current_app.config.get ('NTVMR_DNS_TIMEOUT', 2)
+    dns_timeout = current_app.config.get ('VMRCRE_DNS_TIMEOUT', 2)
     if host and not _resolves_within (host, dns_timeout):
-        _ntvmr_down_until = time.monotonic () + ttl
+        _vmrcre_down_until = time.monotonic () + ttl
         log.warning ('NTVMR DNS for %s did not resolve in %ss; offline, '
                      'skipping NTVMR for %ss', host, dns_timeout, ttl)
         return None
 
     # (connect, read): short connect keeps offline detection snappy; a longer
     # read tolerates a slow-but-reachable NTVMR.
-    timeout = current_app.config.get ('NTVMR_TIMEOUT', (3.05, 10))
+    timeout = current_app.config.get ('VMRCRE_TIMEOUT', (3.05, 10))
     try:
         r = requests.post (url, data = data, timeout = timeout,
                            headers = {'User-Agent': USER_AGENT})
     except Exception as e:  # pylint: disable=broad-except
-        _ntvmr_down_until = time.monotonic () + ttl
+        _vmrcre_down_until = time.monotonic () + ttl
         log.warning ('NTVMR request to %s failed (%s); skipping NTVMR for %ss',
                      url, e, ttl)
         return None
-    _ntvmr_down_until = 0.0       # got a response -> NTVMR reachable again
+    _vmrcre_down_until = 0.0       # got a response -> NTVMR reachable again
     try:
         return minidom.parseString (r.text.encode ('utf-8')).documentElement
     except Exception as e:  # pylint: disable=broad-except
@@ -305,10 +324,10 @@ def ntvmr_service_request (service, data, session_hash = None):
         return None
 
 
-def ntvmr_reachable ():
+def vmrcre_reachable ():
     """Cheap, breaker-aware check: did the NTVMR answer at all right now?
 
-    Unlike ntvmr_service_request, ANY HTTP response (even an error or non-XML
+    Unlike vmrcre_service_request, ANY HTTP response (even an error or non-XML
     body) counts as reachable -- we only care whether the host responded, not
     what it said.  Used when there is no session cookie to probe with (a fresh /
     incognito session) so an unauthenticated LOCAL session can still tell online
@@ -316,25 +335,25 @@ def ntvmr_reachable ():
     above.
     """
 
-    global _ntvmr_down_until
-    if time.monotonic () < _ntvmr_down_until:
+    global _vmrcre_down_until
+    if time.monotonic () < _vmrcre_down_until:
         return False
-    ttl = current_app.config.get ('NTVMR_OFFLINE_TTL', _NTVMR_OFFLINE_TTL)
-    url = ntvmr_api_url () + 'auth/session/check/'
+    ttl = current_app.config.get ('VMRCRE_OFFLINE_TTL', _VMRCRE_OFFLINE_TTL)
+    url = vmrcre_api_url () + 'auth/session/check/'
     host = urllib.parse.urlparse (url).hostname
     if host and not _resolves_within (
-            host, current_app.config.get ('NTVMR_DNS_TIMEOUT', 2)):
-        _ntvmr_down_until = time.monotonic () + ttl
+            host, current_app.config.get ('VMRCRE_DNS_TIMEOUT', 2)):
+        _vmrcre_down_until = time.monotonic () + ttl
         return False
     try:
         requests.post (url, data = {},
-                       timeout = current_app.config.get ('NTVMR_TIMEOUT', (3.05, 10)),
+                       timeout = current_app.config.get ('VMRCRE_TIMEOUT', (3.05, 10)),
                        headers = {'User-Agent': USER_AGENT})
     except Exception as e:  # pylint: disable=broad-except
-        _ntvmr_down_until = time.monotonic () + ttl
+        _vmrcre_down_until = time.monotonic () + ttl
         log.warning ('NTVMR reachability probe to %s failed (%s); offline', url, e)
         return False
-    _ntvmr_down_until = 0.0
+    _vmrcre_down_until = 0.0
     return True
 
 
@@ -342,7 +361,7 @@ def ntvmr_reachable ():
 # Imported identity / roles (offline fallback)
 #
 # A CBGM project is typically a single user on their own laptop.  When the NTVMR
-# is reachable it is ALWAYS authoritative: the current ntvmrSession identity and
+# is reachable it is ALWAYS authoritative: the current vmrcreSession identity and
 # live role checks are used, so roles granted after the import take effect.
 # Only when the NTVMR is UNREACHABLE do we fall back to the importing user's
 # identity and project roles, captured into the instance .conf at import time
@@ -357,7 +376,7 @@ def resolved_project_roles (config, project_name = None):
     request (check) time.  ``CBGM_SAVE_ROLE`` is a full role name; the access
     roles are ``<prefix><value>``.  'public' access needs no role."""
 
-    prefix = config.get ('NTVMR_ROLE_PREFIX', 'CBGM ')
+    prefix = config.get ('VMRCRE_ROLE_PREFIX', 'CBGM ')
     roles = []
     save_role = config.get ('CBGM_SAVE_ROLE') or ''
     if save_role:
@@ -375,10 +394,10 @@ def resolved_project_roles (config, project_name = None):
 
 
 def imported_roles (config):
-    """Set of project roles captured for the importing user (NTVMR_IMPORT_ROLES,
+    """Set of project roles captured for the importing user (VMRCRE_IMPORT_ROLES,
     pipe-separated).  Empty set if none were captured."""
 
-    raw = config.get ('NTVMR_IMPORT_ROLES') or ''
+    raw = config.get ('VMRCRE_IMPORT_ROLES') or ''
     return set (r for r in raw.split ('|') if r)
 
 
@@ -386,16 +405,16 @@ def imported_identity (config):
     """(user_id, user_name) captured at import for this instance, or None if the
     config carries no imported identity (e.g. the root/project-list app)."""
 
-    uid  = config.get ('NTVMR_IMPORT_USER_ID')
-    name = config.get ('NTVMR_IMPORT_USER_NAME')
+    uid  = config.get ('VMRCRE_IMPORT_USER_ID')
+    name = config.get ('VMRCRE_IMPORT_USER_NAME')
     if uid and name and str (uid).isdigit ():
         return (uid, name)
     return None
 
 
 # Short-lived in-process cache of live auth/session/check results, keyed by the
-# ntvmrSession cookie value.  A cookie's identity is stable, so we resolve it
-# against the NTVMR at most once per NTVMR_SESSION_CACHE_TTL seconds instead of
+# vmrcreSession cookie value.  A cookie's identity is stable, so we resolve it
+# against the NTVMR at most once per VMRCRE_SESSION_CACHE_TTL seconds instead of
 # on every request.  Only AUTHORITATIVE outcomes are cached (a valid user, or a
 # reachable rejection); an UNREACHABLE NTVMR is never cached, so we keep
 # retrying and fall back to the .conf identity meanwhile.  Not persisted -- a
@@ -414,7 +433,7 @@ def _check_session (session_hash):
     if hit and hit[0] > now:
         return hit[1]
 
-    root = ntvmr_service_request ('auth/session/check', {}, session_hash)
+    root = vmrcre_service_request ('auth/session/check', {}, session_hash)
     if root is None:
         # Unreachable: do NOT cache -- let the caller fall back to the .conf and
         # retry next request (connectivity can return at any moment).
@@ -428,7 +447,7 @@ def _check_session (session_hash):
             log.info ('NTVMR SSO: authenticated %s (id %s)', user_name, user_id)
             result = ('user', user_id, user_name)
 
-    ttl = current_app.config.get ('NTVMR_SESSION_CACHE_TTL', 300)
+    ttl = current_app.config.get ('VMRCRE_SESSION_CACHE_TTL', 300)
     if ttl > 0:
         if len (_session_cache) > 256:   # opportunistic purge of expired entries
             for k in [k for k, v in _session_cache.items () if v[0] <= now]:
@@ -437,12 +456,12 @@ def _check_session (session_hash):
     return result
 
 
-class NtvmrUser (UserMixin):
+class VmrcreUser (UserMixin):
     """A flask-login user backed by an NTVMR session, not the local user table.
 
     Identity comes from ``auth/session/check``; role membership is resolved on
     demand by ``auth/hasrole``, checking the NTVMR role
-    ``<NTVMR_ROLE_PREFIX><name>`` (default ``CBGM <name>``).
+    ``<VMRCRE_ROLE_PREFIX><name>`` (default ``CBGM <name>``).
     """
 
     def __init__ (self, session_hash, user_id, user_name, roles = None):
@@ -471,18 +490,18 @@ class NtvmrUser (UserMixin):
         return str (self.id)
 
     def has_role (self, *role_names):
-        prefix = current_app.config.get ('NTVMR_ROLE_PREFIX', 'CBGM ')
+        prefix = current_app.config.get ('VMRCRE_ROLE_PREFIX', 'CBGM ')
         if self.imported_roles is not None:
             # Offline fallback: answer from the roles captured at import.  The
             # NTVMR still gates real saves once reachable.
             return any (prefix + r in self.imported_roles for r in role_names)
         # Reachable (normal case): ask the NTVMR live.
-        project = current_app.config.get ('NTVMR_PROJECT_NAME')
+        project = current_app.config.get ('VMRCRE_PROJECT_NAME')
         for role_name in role_names:
             data = { 'role' : prefix + role_name }
             if project:
                 data['projectName'] = project
-            root = ntvmr_service_request ('auth/hasrole', data, self.api_key)
+            root = vmrcre_service_request ('auth/hasrole', data, self.api_key)
             if root is not None and root.getAttribute ('hasRole') == 'true':
                 return True
         return False
@@ -498,7 +517,7 @@ def register_request_loader (login_manager):
 
     @login_manager.request_loader
     def load_user_from_ntvmr (request):  # pylint: disable=unused-variable
-        cookie_name  = current_app.config.get ('NTVMR_SESSION_COOKIE', 'ntvmrSession')
+        cookie_name  = current_app.config.get ('VMRCRE_SESSION_COOKIE', 'vmrcreSession')
         session_hash = request.cookies.get (cookie_name)
 
         # NTVMR reachable -> always authoritative: use the CURRENT session's
@@ -511,9 +530,9 @@ def register_request_loader (login_manager):
             result = _check_session (session_hash)
             # Record whether the NTVMR answered this request, so views can tell
             # "offline" apart from "simply not logged in" (flask.g is per-req).
-            flask.g.ntvmr_reachable = result[0] != 'unreachable'
+            flask.g.vmrcre_reachable = result[0] != 'unreachable'
             if result[0] == 'user':
-                return NtvmrUser (session_hash, result[1], result[2])
+                return VmrcreUser (session_hash, result[1], result[2])
             if result[0] == 'invalid':
                 return None
             # 'unreachable' -> NTVMR down; fall through to offline.
@@ -525,6 +544,6 @@ def register_request_loader (login_manager):
         if identity:
             log.info ('NTVMR offline: serving %s from imported .conf identity',
                       identity[1])
-            return NtvmrUser (session_hash or '', identity[0], identity[1],
+            return VmrcreUser (session_hash or '', identity[0], identity[1],
                               roles = imported_roles (current_app.config))
         return None

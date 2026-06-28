@@ -24,7 +24,6 @@ from flask import current_app, request
 import flask_login
 import psycopg2
 
-import ntvmrimport  # /home/ntg/scripts (see Dockerfile PYTHONPATH)
 
 import login
 from helpers import make_json_response
@@ -32,6 +31,18 @@ from ntg_common.exceptions import PrivilegeError
 
 bp = flask.Blueprint('cbgm_import', __name__)
 log = logging.getLogger(__name__)
+
+
+def _importer_module():
+    """The VMRCRE->CBGM apparatus import driver (scripts/ntvmrimport.py).
+
+    Imported lazily so a vanilla / non-VMRCRE deployment that doesn't ship it on
+    PYTHONPATH still boots -- this module is imported by info.py (for get_status)
+    on every deployment, but only Start CBGM / dump-load actually drive an
+    import.  See vmrcre/CONNECTIONS.md.
+    """
+    import ntvmrimport  # /home/ntg/scripts (see Dockerfile PYTHONPATH)
+    return ntvmrimport
 
 # project_id -> {state, done, total, message, name, app_root}
 # state: provisioning | importing | done | error
@@ -248,11 +259,11 @@ def _conf_quote(val):
 
 def _connection_conf_block(connection_id, connection_api_url):
     """The .conf lines binding a project to the backend it was imported from.
-    NTVMR_API_URL is only written when known, so we never override the inherited
+    VMRCRE_API_URL is only written when known, so we never override the inherited
     default with an empty string."""
     block = 'CONNECTION_ID="%s"\n' % _conf_quote(connection_id)
     if connection_api_url:
-        block += 'NTVMR_API_URL="%s"\n' % _conf_quote(connection_api_url)
+        block += 'VMRCRE_API_URL="%s"\n' % _conf_quote(connection_api_url)
     return block
 
 
@@ -281,7 +292,7 @@ def _capture_import_identity(name):
     granted = []
     for role in login.resolved_project_roles(current_app.config, name):
         data = {'role': role, 'projectName': name}
-        root = login.ntvmr_service_request('auth/hasrole', data, sh)
+        root = login.vmrcre_service_request('auth/hasrole', data, sh)
         if root is not None and root.getAttribute('hasRole') == 'true':
             granted.append(role)
     return {
@@ -330,22 +341,22 @@ def _write_instance_conf(cfg, pid, name, dbname, object_part,
         'READ_ACCESS="public"\n'
         'READ_ACCESS_PRIVATE="Reviewer"\n'
         'WRITE_ACCESS="%(write)s"\n'
-        'NTVMR_PROJECT_ID="%(pid)s"\n'
-        'NTVMR_PROJECT_NAME="%(name)s"\n'
+        'VMRCRE_PROJECT_ID="%(pid)s"\n'
+        'VMRCRE_PROJECT_NAME="%(name)s"\n'
         # NTVMR usergroup/task metadata captured at import time so the project
         # table can be rebuilt from local confs when the NTVMR is unreachable
         # (offline).  See info.projects_json's offline fallback.
-        'NTVMR_TASK_TYPE_ID="%(task)s"\n'
-        'NTVMR_USER_GROUP="%(ug)s"\n'
-        'NTVMR_USER_GROUP_ID="%(ugid)s"\n'
+        'VMRCRE_TASK_TYPE_ID="%(task)s"\n'
+        'VMRCRE_USER_GROUP="%(ug)s"\n'
+        'VMRCRE_USER_GROUP_ID="%(ugid)s"\n'
         # Identity + project roles of the user who performed the import, so the
         # project keeps a usable login (with the right permissions) when the
         # NTVMR is unreachable.  The NTVMR still gates any real save -- it will
         # not let one user save as another -- so this is a fallback identity,
-        # not a grant.  See login.imported_identity / NtvmrUser.has_role.
-        'NTVMR_IMPORT_USER_ID="%(iuid)s"\n'
-        'NTVMR_IMPORT_USER_NAME="%(iuname)s"\n'
-        'NTVMR_IMPORT_ROLES="%(iroles)s"\n'
+        # not a grant.  See login.imported_identity / VmrcreUser.has_role.
+        'VMRCRE_IMPORT_USER_ID="%(iuid)s"\n'
+        'VMRCRE_IMPORT_USER_NAME="%(iuname)s"\n'
+        'VMRCRE_IMPORT_ROLES="%(iroles)s"\n'
         # The VMRCRE backend this project was imported from.  The instance app
         # stays bound to it (its api_url) regardless of the active "Connect
         # to..." selection, so saves go to the right backend.  See
@@ -383,9 +394,10 @@ def _worker(app, pid, object_part, name, meta=None):
 
             _set(pid, state='importing', message='connecting')
             conn = _pg_connect(cfg, dbname)
-            api = cfg.get('NTVMR_API_URL', ntvmrimport.DEFAULT_API_URL)
+            ni = _importer_module()
+            api = cfg.get('VMRCRE_API_URL', ni.DEFAULT_API_URL)
             delay = float(cfg.get('CBGM_IMPORT_DELAY', 0.5))
-            importer = ntvmrimport.Importer(conn, api, '-1', delay=delay)
+            importer = ni.Importer(conn, api, '-1', delay=delay)
 
             def progress(done, total, message):
                 _set(pid, state='importing', done=done, total=total,
@@ -432,7 +444,7 @@ def _worker_dump(app, pid, name, dump_path, object_part, meta=None):
             # our per-verse backup handle longer sub-reading labels.
             conn = _pg_connect(cfg, dbname)
             try:
-                ntvmrimport.Importer(conn, '', '-1').widen_labez_columns()
+                _importer_module().Importer(conn, '', '-1').widen_labez_columns()
             finally:
                 conn.close()
 

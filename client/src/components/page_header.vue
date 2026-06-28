@@ -47,22 +47,22 @@
           <b-dropdown-divider />
           <b-dropdown-item
             v-if="is_logged_in"
-            :href="ntvmr_site_url"
+            :href="vmrcre_site_url"
             target="_blank"
             rel="noopener"
             >{{ current_user.username }} — open ↗</b-dropdown-item
           >
-          <b-dropdown-item v-else-if="active_connection" :href="ntvmr_login_url"
+          <b-dropdown-item v-else-if="active_connection" :href="vmrcre_login_url"
             >Log in to {{ active_connection.label }}</b-dropdown-item
           >
         </b-nav-item-dropdown>
 
         <!-- Single backend: the original Log In / username item. -->
         <template v-else>
-          <b-nav-item v-if="is_logged_in === false" style="position: absolute; right:0;" :href="ntvmr_login_url"
+          <b-nav-item v-if="is_logged_in === false" style="position: absolute; right:0;" :href="vmrcre_login_url"
             >Log In</b-nav-item
           >
-          <b-nav-item v-if="is_logged_in === true" style="position: absolute; right:0;" :href="ntvmr_site_url" target="_blank" rel="noopener"
+          <b-nav-item v-if="is_logged_in === true" style="position: absolute; right:0;" :href="vmrcre_site_url" target="_blank" rel="noopener"
             >{{ current_user.username }}</b-nav-item
           >
         </template>
@@ -90,6 +90,7 @@ import { BDropdownDivider } from "bootstrap-vue/src/components/dropdown/dropdown
 
 import wwu_logo from "../images/wwu_logo.svg";
 import intf2021 from "../images/intf2021.jpeg";
+import { login_url, site_url } from "../js/connections";
 
 export default {
   components: {
@@ -164,35 +165,14 @@ export default {
       }
       return navlist;
     },
-    ntvmr_login_url: function() {
-      // Shown only when the silent SSO probe found no session, i.e. the user is
-      // not logged into the active backend.  Send them to its portal login,
-      // chained back through auth/session/check so they return here with a
-      // session.  See vmrcre/CONNECTIONS.md.
-      const a = this.active_connection;
-      if (!a) return "";
-      const api = a.api_url.replace(/\/?$/, "/");
-      let origin = "";
-      try {
-        origin = new URL(api).origin;
-      } catch (e) {
-        /* no backend configured */
-      }
-      const here = window.location.origin + window.location.pathname;
-      const session_check =
-        api + "auth/session/check/?r=" + encodeURIComponent(here);
-      return origin + "/c/portal/login?redirect=" + encodeURIComponent(session_check);
+    // The active backend's portal-login URL (shown when not logged in) and site
+    // root (the logged-in username links there; the session belongs to the
+    // VMRCRE, so there is no CBGM-local logout).  See js/connections.js.
+    vmrcre_login_url: function() {
+      return login_url(this.active_connection);
     },
-    ntvmr_site_url: function() {
-      // The logged-in username links to the active VMRCRE (the identity
-      // provider), which is where a user manages or ends their session.  There
-      // is no CBGM-local logout: the session belongs to the VMRCRE.
-      const a = this.active_connection;
-      try {
-        return new URL(a.api_url).origin + "/";
-      } catch (e) {
-        return "/";
-      }
+    vmrcre_site_url: function() {
+      return site_url(this.active_connection);
     }
   },
   methods: {
@@ -202,7 +182,7 @@ export default {
     connect_to: function(conn) {
       // Already connected and logged in here -> just open that VMRCRE.
       if (this.is_active(conn) && this.is_logged_in) {
-        window.open(this.ntvmr_site_url, "_blank", "noopener");
+        window.open(this.vmrcre_site_url, "_blank", "noopener");
         return;
       }
       // Remember the chosen backend so the server resolves it after the bounce,
@@ -210,9 +190,9 @@ export default {
       // one.  See vmrcre/CONNECTIONS.md.
       document.cookie =
         "cbgmConnection=" + encodeURIComponent(conn.id) + "; path=/; SameSite=Lax";
-      document.cookie = "ntvmrSession=; path=/; Max-Age=0; SameSite=Lax";
+      document.cookie = "vmrcreSession=; path=/; Max-Age=0; SameSite=Lax";
       try {
-        window.sessionStorage.removeItem("ntvmr_sso_tried");
+        window.sessionStorage.removeItem("vmrcre_sso_tried");
       } catch (e) {
         /* noop */
       }

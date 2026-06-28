@@ -38,13 +38,13 @@ Empty string = start standalone. Base ships `ntvmr` (preserves today's
 behaviour); the **B2 toggle** for an upstream/standalone build is to set it `''`.
 
 **Server resolver — `active_connection()`** (one place, used by
-`ntvmr_api_url()`):
+`vmrcre_api_url()`):
 
 1. Instance sub-app bound to a connection (its `.conf` `CONNECTION_ID`) → that.
 2. Root/info app → the `cbgmConnection=<id>` cookie → registry lookup.
 3. Else → `CBGM_DEFAULT_CONNECTION` (may be empty → standalone, no NTVMR calls).
 
-Back-compat: a deploy with only the legacy `NTVMR_API_URL` set (no
+Back-compat: a deploy with only the legacy `VMRCRE_API_URL` set (no
 `CBGM_CONNECTIONS`) synthesises a single `ntvmr` connection from it, so existing
 single-backend installs are unchanged.
 
@@ -53,12 +53,12 @@ session cookie (that backend's hash). Switching = set `cbgmConnection`, clear th
 session, re-run the SSO dance against the new backend's domain.
 
 **Per-project binding:** `_write_instance_conf` persists `CONNECTION_ID` +
-`NTVMR_API_URL`, so an opened project resolves its own backend regardless of the
+`VMRCRE_API_URL`, so an opened project resolves its own backend regardless of the
 active connection.
 
 **Client:** `connections.json` (registry + active id) drives a "Connect to… ▾"
 menu in the page header; the active connection's `api_url` replaces the single
-`window.ntvmr_api_url` for the SSO probe/redirect, login link, and site link.
+`window.vmrcre_api_url` for the SSO probe/redirect, login link, and site link.
 
 ## Behaviour matrix
 
@@ -71,12 +71,12 @@ menu in the page header; the active connection's `api_url` replaces the single
 ## Phasing
 
 1. **Backend abstraction (server)** — registry + `active_connection()` +
-   `connections.json` + `ntvmr_api_url()` via the resolver + persist
-   `CONNECTION_ID`/`NTVMR_API_URL` in instance confs. NTVMR default-active →
+   `connections.json` + `vmrcre_api_url()` via the resolver + persist
+   `CONNECTION_ID`/`VMRCRE_API_URL` in instance confs. NTVMR default-active →
    zero behaviour change; standalone (`default=''`) drops out for free (closes
    B2). *No UI change.*
 2. **"Connect to…" menu (client)** — the dropdown, switching, the
-   `cbgmConnection` cookie, standalone empty-state; `window.ntvmr_api_url` →
+   `cbgmConnection` cookie, standalone empty-state; `window.vmrcre_api_url` →
    active-connection resolution.
 3. **Multi-backend list** — grouping/badging by connection, reconnect-to-save,
    CoptOT as a live second connection.

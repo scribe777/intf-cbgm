@@ -47,7 +47,7 @@
       />
       <p v-if="offline && projects.length" class="text-muted">
         <em>Offline</em> &mdash; showing the projects already loaded on this
-        computer. <a :href="ntvmr_login_url">Log in</a> when you're back online
+        computer. <a :href="vmrcre_login_url">Log in</a> when you're back online
         to see all the projects you can work on.
       </p>
       <table
@@ -143,7 +143,7 @@
         yet. Connect to the internet and log in to start one.
       </p>
       <p v-else-if="!is_logged_in">
-        <a :href="ntvmr_login_url">Log in</a> to see the projects you can work
+        <a :href="vmrcre_login_url">Log in</a> to see the projects you can work
         on.
       </p>
       <p v-else>
@@ -286,6 +286,7 @@ import url from "url";
 
 import ECMActs from "../images/ECMActs.jpg";
 import Docker from "../images/docker.png";
+import { login_url } from "../js/connections";
 
 export default {
   data: function() {
@@ -324,20 +325,8 @@ export default {
       );
       return groups;
     },
-    ntvmr_login_url: function() {
-      const api = window.ntvmr_api_url || "";
-      let origin = "";
-      try {
-        origin = new URL(api).origin;
-      } catch (e) {
-        /* no NTVMR configured */
-      }
-      const here = window.location.origin + window.location.pathname;
-      const session_check =
-        api + "auth/session/check/?r=" + encodeURIComponent(here);
-      return (
-        origin + "/c/portal/login?redirect=" + encodeURIComponent(session_check)
-      );
+    vmrcre_login_url: function() {
+      return login_url(this.active_connection);
     }
   },
   created: function() {

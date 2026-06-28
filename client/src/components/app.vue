@@ -411,7 +411,7 @@ export default {
         });
     },
     // Load the VMRCRE connection registry + active connection (a LOCAL endpoint,
-    // so it works offline too) and point window.ntvmr_api_url at the active
+    // so it works offline too) and point window.vmrcre_api_url at the active
     // backend for the SSO handshake.  No active connection => standalone (no
     // SSO).  See vmrcre/CONNECTIONS.md.
     load_connections() {
@@ -422,10 +422,10 @@ export default {
           const d = (r.data && r.data.data) || r.data || {};
           vm.$store.commit("connections", d);
           const active = vm.$store.getters.active_connection;
-          window.ntvmr_api_url = active ? active.api_url : "";
+          window.vmrcre_api_url = active ? active.api_url : "";
         })
         .catch(() => {
-          // Keep the api.conf.js fallback already in window.ntvmr_api_url.
+          // Keep the api.conf.js fallback already in window.vmrcre_api_url.
         });
     }
   },
@@ -441,7 +441,7 @@ export default {
     if (returned_from_dance) {
       if (sess && sess !== "null") {
         document.cookie =
-          "ntvmrSession=" + encodeURIComponent(sess) + "; path=/; SameSite=Lax";
+          "vmrcreSession=" + encodeURIComponent(sess) + "; path=/; SameSite=Lax";
       }
       params.delete("vmrcreSession");
       const qs = params.toString();
@@ -451,7 +451,7 @@ export default {
         window.location.pathname + (qs ? "?" + qs : "") + window.location.hash
       );
     }
-    // Resolve the active VMRCRE backend (sets window.ntvmr_api_url) BEFORE the
+    // Resolve the active VMRCRE backend (sets window.vmrcre_api_url) BEFORE the
     // SSO gate below, which keys off it.  No active connection => standalone.
     await vm.load_connections();
     // Automatic single sign-on.  If we have no session yet, bounce once through
@@ -461,21 +461,21 @@ export default {
     // logged in; if not, we come back with none and show "Log In".  A
     // sessionStorage guard makes this happen at most once, so logged-out users
     // don't loop.  See vmrcre/README.md.
-    const has_cookie = document.cookie.indexOf("ntvmrSession=") !== -1;
+    const has_cookie = document.cookie.indexOf("vmrcreSession=") !== -1;
     let tried = false;
     try {
-      tried = window.sessionStorage.getItem("ntvmr_sso_tried") === "1";
+      tried = window.sessionStorage.getItem("vmrcre_sso_tried") === "1";
     } catch (e) {
       tried = true; // no sessionStorage -> don't risk a loop
     }
     if (returned_from_dance) {
       try {
-        window.sessionStorage.setItem("ntvmr_sso_tried", "1");
+        window.sessionStorage.setItem("vmrcre_sso_tried", "1");
       } catch (e) {
         /* noop */
       }
     }
-    if (!has_cookie && !tried && !returned_from_dance && window.ntvmr_api_url) {
+    if (!has_cookie && !tried && !returned_from_dance && window.vmrcre_api_url) {
       // Probe the NTVMR before doing a *top-level* SSO redirect.  A navigation
       // hangs forever when offline (blank screen, stuck on the NTVMR URL); a
       // fetch fails fast.  Only bounce if the NTVMR is actually reachable --
@@ -485,7 +485,7 @@ export default {
         ctrl.abort();
       }, 2500);
       window
-        .fetch(window.ntvmr_api_url + "auth/session/check/", {
+        .fetch(window.vmrcre_api_url + "auth/session/check/", {
           mode: "no-cors",
           signal: ctrl.signal
         })
@@ -493,13 +493,13 @@ export default {
           window.clearTimeout(timer);
           // NTVMR reachable -> do the one-time SSO bounce (top-level redirect).
           try {
-            window.sessionStorage.setItem("ntvmr_sso_tried", "1");
+            window.sessionStorage.setItem("vmrcre_sso_tried", "1");
           } catch (e) {
             /* noop */
           }
           const here = window.location.origin + window.location.pathname;
           window.location.href =
-            window.ntvmr_api_url +
+            window.vmrcre_api_url +
             "auth/session/check/?r=" +
             encodeURIComponent(here);
         })

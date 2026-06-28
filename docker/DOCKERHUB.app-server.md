@@ -50,7 +50,7 @@ projects persist and reappear next time.
 ### Configuration (compose environment)
 | variable | default | meaning |
 |----------|---------|---------|
-| `NTVMR_API_URL` | `https://ntvmr.uni-muenster.de/community/vmr/api/` | NTVMR to authenticate against and import from |
+| `VMRCRE_API_URL` | `https://ntvmr.uni-muenster.de/community/vmr/api/` | NTVMR to authenticate against and import from |
 | `CBGM_SCHEMA_TEMPLATE_DB` | `cbgm_template` | empty schema each project DB is cloned from |
 | `CBGM_IMPORT_DELAY` | `0.5` | seconds between apparatus requests |
 | `CBGM_START_ROLE` | *(empty)* | if set, NTVMR role (prefixed `CBGM `) required to start an import; empty = any logged-in user |

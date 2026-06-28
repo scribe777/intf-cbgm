@@ -26,12 +26,12 @@ trusts the NTVMR session and delegates role checks to the NTVMR.
 How it works (all in `server/login.py`, wired up in `server/__main__.py`):
 
 - A flask-login **`request_loader`** reads the NTVMR session cookie
-  (`NTVMR_SESSION_COOKIE`, default `ntvmrSession`), calls
+  (`VMRCRE_SESSION_COOKIE`, default `vmrcreSession`), calls
   `…/api/auth/session/check/` with that `sessionHash`, and on a `<user>`
-  response builds an **`NtvmrUser`** from `internalUserID` + `userName`.
+  response builds an **`VmrcreUser`** from `internalUserID` + `userName`.
   This is the single-sign-on: a logged-in NTVMR user is a logged-in CBGM user.
-- `NtvmrUser.has_role(name)` delegates to `…/api/auth/hasrole`, checking the
-  NTVMR role **`<NTVMR_ROLE_PREFIX><name>`** (default prefix `CBGM `, so the
+- `VmrcreUser.has_role(name)` delegates to `…/api/auth/hasrole`, checking the
+  NTVMR role **`<VMRCRE_ROLE_PREFIX><name>`** (default prefix `CBGM `, so the
   tool's `editor` role is the NTVMR role `CBGM editor`). Because the existing
   access layer (`login.user_can_read/write`, `edit_auth`, etc.) already calls
   `current_user.has_role(...)`, **no other server code needed changing** — this
@@ -47,13 +47,13 @@ Set these per-instance in `instance/*.conf` (defaults in
 
 | key | default | meaning |
 |-----|---------|---------|
-| `NTVMR_API_URL`        | `https://ntvmr.uni-muenster.de/community/vmr/api/` | NTVMR API base |
-| `NTVMR_SESSION_COOKIE` | `ntvmrSession` | name of the NTVMR session cookie |
-| `NTVMR_ROLE_PREFIX`    | `CBGM ` | prefix mapping tool roles → NTVMR roles |
-| `NTVMR_PROJECT_NAME`   | *(unset)* | if set, `has_role` is scoped to this NTVMR project |
+| `VMRCRE_API_URL`        | `https://ntvmr.uni-muenster.de/community/vmr/api/` | NTVMR API base |
+| `VMRCRE_SESSION_COOKIE` | `vmrcreSession` | name of the NTVMR session cookie |
+| `VMRCRE_ROLE_PREFIX`    | `CBGM ` | prefix mapping tool roles → NTVMR roles |
+| `VMRCRE_PROJECT_NAME`   | *(unset)* | if set, `has_role` is scoped to this NTVMR project |
 
 `auth/hasrole` accepts `projectID`/`projectName`/`userGroupName` scoping, so
-`NTVMR_PROJECT_NAME` is the hook for step 3: roles checked **within a specific
+`VMRCRE_PROJECT_NAME` is the hook for step 3: roles checked **within a specific
 project** rather than globally. Leave it unset for global `CBGM <role>` checks.
 
 To enable a role gate, set the standard CBGM access keys to a role name, e.g.

@@ -31,7 +31,7 @@ import flask
 from flask import current_app, request
 import flask_login
 
-import login  # ntvmr_service_request
+import login  # vmrcre_service_request
 from helpers import make_json_response, Passage
 
 bp = flask.Blueprint('cbgm_backup', __name__)
@@ -253,7 +253,7 @@ def list_pending(conn, user_name):
 # --------------------------------------------------------------------------- #
 
 def _project_id():
-    return current_app.config.get('NTVMR_PROJECT_ID')
+    return current_app.config.get('VMRCRE_PROJECT_ID')
 
 
 def user_can_save(session_hash):
@@ -267,10 +267,10 @@ def user_can_save(session_hash):
     if not role:
         return True
     data = {'role': role}
-    project = current_app.config.get('NTVMR_PROJECT_NAME')
+    project = current_app.config.get('VMRCRE_PROJECT_NAME')
     if project:
         data['projectName'] = project
-    root = login.ntvmr_service_request('auth/hasrole', data, session_hash)
+    root = login.vmrcre_service_request('auth/hasrole', data, session_hash)
     if root is not None:
         # Reachable: authoritative (picks up role changes since import).
         return root.getAttribute('hasRole') == 'true'
@@ -288,7 +288,7 @@ def put_segment(project_id, ref, fragment, user_name, session_hash, push='false'
     uses 'true'.
     """
 
-    return login.ntvmr_service_request(
+    return login.vmrcre_service_request(
         'projectmanagement/project/data/put',
         {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + ref,
          'subKey': EDITS_SUBKEY, 'userName': user_name,
@@ -299,7 +299,7 @@ def put_segment(project_id, ref, fragment, user_name, session_hash, push='false'
 def get_segment(project_id, ref, user_name, session_hash):
     """Return a fragment dict for (passage ref, user), or None."""
 
-    root = login.ntvmr_service_request(
+    root = login.vmrcre_service_request(
         'projectmanagement/project/data/get',
         {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + ref,
          'subKey': EDITS_SUBKEY, 'userName': user_name},
@@ -326,7 +326,7 @@ def list_all_refs(project_id, session_hash):
     fragment, so the key never has to be parsed back.
     """
 
-    root = login.ntvmr_service_request(
+    root = login.vmrcre_service_request(
         'projectmanagement/project/data/listchildren',
         {'projectID': str(project_id), 'key': 'cbgm/edits'}, session_hash)
     refs = []
@@ -345,7 +345,7 @@ def list_segment_users(project_id, ref, session_hash):
     users are the children of <ref>/initial.
     """
 
-    root = login.ntvmr_service_request(
+    root = login.vmrcre_service_request(
         'projectmanagement/project/data/listchildren',
         {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + ref + '/initial'},
         session_hash)
@@ -603,8 +603,15 @@ def editorial_status():
     # .conf imported-roles fallback when offline (incl. a cookieless/incognito
     # session served from the imported identity).
     can = user_can_save(sh)
+    # Tell the editor which backend this project belongs to and whether it is the
+    # one the user is currently connected to -- so it can prompt "reconnect to X
+    # to save" when you open a project from a non-active backend.  See
+    # vmrcre/CONNECTIONS.md.
+    backend = login.active_connection() or {}
     return make_json_response({'pending': pending, 'count': len(pending),
-                               'can_save': can, 'me': me})
+                               'can_save': can, 'me': me,
+                               'connection_label': backend.get('label', ''),
+                               'connection_active': login.instance_is_active()})
 
 
 @bp.route('/editorial/sync.json', methods=['POST', 'OPTIONS'])

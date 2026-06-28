@@ -82,17 +82,17 @@ class Config ():
     # NTVMR single sign-on (see vmrcre/README.md).  Override per instance.
     # Overridable via environment (so the published image is configured from
     # the compose file).  See vmrcre/README.md.
-    NTVMR_API_URL = os.environ.get(
-        'NTVMR_API_URL', 'https://ntvmr.uni-muenster.de/community/vmr/api/')
+    VMRCRE_API_URL = os.environ.get(
+        'VMRCRE_API_URL', 'https://ntvmr.uni-muenster.de/community/vmr/api/')
     # Selectable VMRCRE backends for the "Connect to..." menu (see
     # vmrcre/CONNECTIONS.md).  A list of {id, label, api_url, site_url}; override
     # the whole list via the CBGM_CONNECTIONS env var (JSON).  A deployment with
-    # only the legacy NTVMR_API_URL set (no list) synthesises a single 'ntvmr'
+    # only the legacy VMRCRE_API_URL set (no list) synthesises a single 'ntvmr'
     # connection from it, so existing single-backend installs are unchanged.
     CBGM_CONNECTIONS = json.loads(os.environ['CBGM_CONNECTIONS']) if os.environ.get(
         'CBGM_CONNECTIONS') else [
         {'id': 'ntvmr', 'label': 'NTVMR',
-         'api_url': NTVMR_API_URL,
+         'api_url': VMRCRE_API_URL,
          'site_url': 'https://ntvmr.uni-muenster.de/'},
         {'id': 'coptot', 'label': 'CoptOT',
          'api_url': 'https://coptot.manuscriptroom.com/community/vmr/api/',
@@ -102,9 +102,9 @@ class Config ():
     # standalone (vanilla CBGM, no SSO) -- the toggle for an upstream build.
     # Base ships 'ntvmr' so our hosted behaviour is unchanged.
     CBGM_DEFAULT_CONNECTION = os.environ.get('CBGM_DEFAULT_CONNECTION', 'ntvmr')
-    NTVMR_SESSION_COOKIE = os.environ.get('NTVMR_SESSION_COOKIE', 'ntvmrSession')
-    NTVMR_ROLE_PREFIX = os.environ.get('NTVMR_ROLE_PREFIX', 'CBGM ')
-    NTVMR_PROJECT_NAME = None
+    VMRCRE_SESSION_COOKIE = os.environ.get('VMRCRE_SESSION_COOKIE', 'vmrcreSession')
+    VMRCRE_ROLE_PREFIX = os.environ.get('VMRCRE_ROLE_PREFIX', 'CBGM ')
+    VMRCRE_PROJECT_NAME = None
     # "Start CBGM" import.
     CBGM_SCHEMA_TEMPLATE_DB = os.environ.get(
         'CBGM_SCHEMA_TEMPLATE_DB', 'cbgm_template')  # data-less schema cloned from here
@@ -126,7 +126,7 @@ class Config ():
     # identity isn't re-resolved against the NTVMR on every request.  Role
     # freshness is unaffected (roles are checked live at save time).  0 disables
     # the cache (resolve every request).
-    NTVMR_SESSION_CACHE_TTL = int(os.environ.get('NTVMR_SESSION_CACHE_TTL', '300'))
+    VMRCRE_SESSION_CACHE_TTL = int(os.environ.get('VMRCRE_SESSION_CACHE_TTL', '300'))
     # Where Start CBGM writes per-project instance confs.  Keep this OUT of the
     # baked instance/ dir so it can be a persistent volume without hiding
     # _global.conf.

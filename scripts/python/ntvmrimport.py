@@ -47,7 +47,7 @@ USER_AGENT = 'intf-cbgm ntvmrimport/1.0'
 
 # NTVMR verse hash encodes the book as (2000 + CBGM book id) for the NT, e.g.
 # 1Tim.1.1 -> 2015001001 -> CBGM book 15.
-NTVMR_BOOK_OFFSET = 2000
+VMRCRE_BOOK_OFFSET = 2000
 
 # CBGM uses only Greek manuscripts (papyri/majuscules/minuscules/lectionaries);
 # versions, fathers and editions are not part of the genealogical computation.
@@ -119,7 +119,7 @@ def book_chapter_verse(verse_hash):
     """Decode an NTVMR verse hash into (cbgm_book, chapter, verse)."""
 
     return (
-        verse_hash // 1000000 - NTVMR_BOOK_OFFSET,
+        verse_hash // 1000000 - VMRCRE_BOOK_OFFSET,
         (verse_hash // 1000) % 1000,
         verse_hash % 1000,
     )
@@ -451,7 +451,7 @@ def build_parser():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--object-part', required=True,
                    help="project objectPart / verse reference, e.g. '1Tim-Titus'")
-    p.add_argument('--api-url', default=os.environ.get('NTVMR_API_URL', DEFAULT_API_URL),
+    p.add_argument('--api-url', default=os.environ.get('VMRCRE_API_URL', DEFAULT_API_URL),
                    help="NTVMR API base url")
     p.add_argument('--segment-group-id', default='-1',
                    help="apparatus segmentGroupID (default -1 = all/auto)")

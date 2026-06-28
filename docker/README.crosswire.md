@@ -36,7 +36,7 @@ their instances) persist in the named volumes and reappear on the next start.
 
 | variable | default | meaning |
 |----------|---------|---------|
-| `NTVMR_API_URL` | `https://ntvmr.uni-muenster.de/community/vmr/api/` | the NTVMR this instance authenticates against and imports from |
+| `VMRCRE_API_URL` | `https://ntvmr.uni-muenster.de/community/vmr/api/` | the NTVMR this instance authenticates against and imports from |
 | `CBGM_SCHEMA_TEMPLATE_DB` | `cbgm_template` | the empty schema each project DB is cloned from |
 | `CBGM_IMPORT_DELAY` | `0.5` | seconds between apparatus requests (politeness) |
 | `CBGM_START_ROLE` | `Editor` | NTVMR role (prefixed `CBGM `) required to start an import |

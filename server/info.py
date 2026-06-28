@@ -9,8 +9,8 @@ from flask import current_app
 import flask_login
 
 from helpers import make_json_response
-from login import (user_can_read, user_can_write, ntvmr_service_request,
-                   ntvmr_reachable, connections, active_connection)
+from login import (user_can_read, user_can_write, vmrcre_service_request,
+                   vmrcre_reachable, connections, active_connection)
 from cbgm_import import get_status
 
 bp = flask.Blueprint('info', __name__)
@@ -72,7 +72,7 @@ def projects_json():
     active = active_connection()
     active_id = active.get('id') if active else None
     # Did the active backend answer during this request?  None means "not probed".
-    reachable = getattr(flask.g, 'ntvmr_reachable', None)
+    reachable = getattr(flask.g, 'vmrcre_reachable', None)
 
     # Every locally-mounted project, keyed by (backend, project), so a project
     # imported from a non-active backend still shows (and can't collide with a
@@ -87,7 +87,7 @@ def projects_json():
                           if cid == active_id}
         # A user's projects come from the usergroups they belong to; each
         # usergroup carries its project.
-        root = ntvmr_service_request(
+        root = vmrcre_service_request(
             'projectmanagement/usergroup/get',
             {'userName': user.username},
             user.api_key
@@ -120,7 +120,7 @@ def projects_json():
     if reachable is None and active and not live_ok:
         # No session cookie to probe with (a fresh / incognito window); a cheap,
         # breaker-aware check so the banner is right.
-        reachable = ntvmr_reachable()
+        reachable = vmrcre_reachable()
     offline = bool(active) and reachable is False
 
     return make_json_response({
@@ -148,7 +148,7 @@ def _projects_from_instances():
     rows = []
     for inst in instances.values():
         c = inst.config
-        pid = c.get('NTVMR_PROJECT_ID')
+        pid = c.get('VMRCRE_PROJECT_ID')
         if not pid:
             continue
         cid = c.get('CONNECTION_ID') or ''
@@ -157,11 +157,11 @@ def _projects_from_instances():
         root_path = c.get('APPLICATION_DIR', c.get('APPLICATION_ROOT', ''))
         rows.append({
             'project_id': str(pid),
-            'name': c.get('NTVMR_PROJECT_NAME', c.get('APPLICATION_NAME', '')),
+            'name': c.get('VMRCRE_PROJECT_NAME', c.get('APPLICATION_NAME', '')),
             'object_part': c.get('BOOK', ''),
-            'task_type_id': c.get('NTVMR_TASK_TYPE_ID', ''),
-            'user_group': c.get('NTVMR_USER_GROUP', ''),
-            'user_group_id': c.get('NTVMR_USER_GROUP_ID', ''),
+            'task_type_id': c.get('VMRCRE_TASK_TYPE_ID', ''),
+            'user_group': c.get('VMRCRE_USER_GROUP', ''),
+            'user_group_id': c.get('VMRCRE_USER_GROUP_ID', ''),
             'instance_root': root_path.rstrip('/') + '/' if root_path else None,
             'import': get_status(pid),
             'connection_id': cid,

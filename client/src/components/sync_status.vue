@@ -2,11 +2,18 @@
   <span v-if="loaded" class="sync-status" :title="hint">
     <span v-if="count === 0" class="sync-ok">✓ synced</span>
     <span v-else class="sync-dirty">
-      <span class="sync-icon">{{ can_save ? '⏳' : '🔒' }}</span>
-      {{ count }} unsynced
-      <button type="button" class="btn btn-sm btn-outline-primary sync-btn"
-              :disabled="busy || !can_save"
-              @click="sync_now">{{ busy ? 'syncing…' : 'Sync now' }}</button>
+      <template v-if="connection_active">
+        <span class="sync-icon">{{ can_save ? '⏳' : '🔒' }}</span>
+        {{ count }} unsynced
+        <button type="button" class="btn btn-sm btn-outline-primary sync-btn"
+                :disabled="busy || !can_save"
+                @click="sync_now">{{ busy ? 'syncing…' : 'Sync now' }}</button>
+      </template>
+      <template v-else>
+        <span class="sync-icon">🔌</span>
+        {{ count }} saved locally &mdash; reconnect to
+        <strong>{{ connection_label || 'its VMRCRE' }}</strong> to save
+      </template>
     </span>
   </span>
 </template>
@@ -32,6 +39,8 @@ export default {
             'loaded'   : false,
             'count'    : 0,
             'can_save' : false,
+            'connection_label'  : '',
+            'connection_active' : true,
             'busy'     : false,
             'timer'    : null,
         };
@@ -40,6 +49,11 @@ export default {
         hint () {
             if (this.count === 0) {
                 return 'All your editorial decisions are synced to the NTVMR.';
+            }
+            if (!this.connection_active) {
+                return this.count + ' segment(s) saved locally. This project'
+                    + ' belongs to ' + (this.connection_label || 'another VMRCRE')
+                    + '; choose it in “Connect to…” to sync your work there.';
             }
             if (!this.can_save) {
                 return this.count + ' segment(s) edited and saved locally, but you'
@@ -77,6 +91,9 @@ export default {
                     const d = response.data.data || response.data;
                     vm.count    = d.count || 0;
                     vm.can_save = !!d.can_save;
+                    vm.connection_label  = d.connection_label || '';
+                    // default true so a normal single-backend project is unaffected
+                    vm.connection_active = d.connection_active !== false;
                     vm.loaded   = true;
                 })
                 .catch (() => { /* not in a project instance / not logged in */ });
