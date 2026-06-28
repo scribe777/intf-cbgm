@@ -102,6 +102,13 @@ class Config ():
     # standalone (vanilla CBGM, no SSO) -- the toggle for an upstream build.
     # Base ships 'ntvmr' so our hosted behaviour is unchanged.
     CBGM_DEFAULT_CONNECTION = os.environ.get('CBGM_DEFAULT_CONNECTION', 'ntvmr')
+    # Classic "shared instance" mode (how the tool worked before the VMRCRE
+    # integration): advertise NO backends -- no SSO, no "Connect to..." menu;
+    # list only the locally loaded project DBs and authenticate against the
+    # instance's own user table via flask_user, with rights/roles from that DB.
+    # See vmrcre/CONNECTIONS.md.
+    CBGM_LOCAL_ONLY = os.environ.get(
+        'CBGM_LOCAL_ONLY', '').lower() in ('1', 'true', 'yes')
     VMRCRE_SESSION_COOKIE = os.environ.get('VMRCRE_SESSION_COOKIE', 'vmrcreSession')
     VMRCRE_ROLE_PREFIX = os.environ.get('VMRCRE_ROLE_PREFIX', 'CBGM ')
     VMRCRE_PROJECT_NAME = None

@@ -553,6 +553,8 @@ def editorial_save(pass_id):
 
     if request.method == 'OPTIONS':
         return make_json_response({})
+    if not login.editorial_sync_enabled():
+        return make_json_response({'saved': False, 'reason': 'local-only'})
     me = _current_user_name()
     sh = getattr(flask_login.current_user, 'api_key', None)
     if not (me and sh):
@@ -589,10 +591,16 @@ def editorial_save(pass_id):
 def editorial_status():
     """Outbox status for the current user: pending segments + can-save flag."""
 
+    # Classic local-authoritative project: no VMRCRE sync, so the outbox UI is
+    # not shown (the local pg DB is the source of truth).  See vmrcre/CONNECTIONS.md.
+    if not login.editorial_sync_enabled():
+        return make_json_response({'enabled': False, 'pending': [], 'count': 0,
+                                   'can_save': False})
     me = _current_user_name()
     sh = getattr(flask_login.current_user, 'api_key', None)
     if not me:
-        return make_json_response({'pending': [], 'count': 0, 'can_save': False})
+        return make_json_response({'enabled': True, 'pending': [], 'count': 0,
+                                   'can_save': False})
     conn = current_app.config.dba.engine.raw_connection()
     try:
         pending = list_pending(conn, me)
@@ -608,7 +616,8 @@ def editorial_status():
     # to save" when you open a project from a non-active backend.  See
     # vmrcre/CONNECTIONS.md.
     backend = login.active_connection() or {}
-    return make_json_response({'pending': pending, 'count': len(pending),
+    return make_json_response({'enabled': True,
+                               'pending': pending, 'count': len(pending),
                                'can_save': can, 'me': me,
                                'connection_label': backend.get('label', ''),
                                'connection_active': login.instance_is_active()})
@@ -620,6 +629,8 @@ def editorial_sync():
 
     if request.method == 'OPTIONS':
         return make_json_response({})
+    if not login.editorial_sync_enabled():
+        return make_json_response({'synced': False, 'reason': 'local-only'})
     me = _current_user_name()
     sh = getattr(flask_login.current_user, 'api_key', None)
     pid = _project_id()

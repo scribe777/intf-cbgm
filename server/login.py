@@ -174,6 +174,10 @@ def connections (config):
     synthesises a single 'ntvmr' connection from it, so existing single-backend
     installs keep working unchanged.
     """
+    # Classic local-only deployment: advertise no backends at all (no SSO, no
+    # "Connect to..." menu; the project list falls back to the loaded instances).
+    if config.get ('CBGM_LOCAL_ONLY'):
+        return []
     conns = config.get ('CBGM_CONNECTIONS')
     if conns:
         return conns
@@ -226,6 +230,16 @@ def selected_connection_id ():
     if flask.has_request_context ():
         conn_id = flask.request.cookies.get ('cbgmConnection')
     return conn_id or current_app.config.get ('CBGM_DEFAULT_CONNECTION', '')
+
+
+def editorial_sync_enabled ():
+    """True if this project instance syncs editorial decisions to a VMRCRE
+    backend.  False for a classic local-authoritative project (no VMRCRE backing)
+    or a CBGM_LOCAL_ONLY deployment -- there the local pg DB IS the source of
+    truth, so the outbox / save-to-VMRCRE layer stays out of the way.  See
+    vmrcre/CONNECTIONS.md."""
+    config = current_app.config
+    return bool (config.get ('VMRCRE_PROJECT_ID')) and not config.get ('CBGM_LOCAL_ONLY')
 
 
 def instance_is_active ():

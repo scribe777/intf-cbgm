@@ -1,5 +1,5 @@
 <template>
-  <span v-if="loaded" class="sync-status" :title="hint">
+  <span v-if="loaded && enabled" class="sync-status" :title="hint">
     <span v-if="count === 0" class="sync-ok">✓ synced</span>
     <span v-else class="sync-dirty">
       <template v-if="connection_active">
@@ -37,6 +37,7 @@ export default {
     data () {
         return {
             'loaded'   : false,
+            'enabled'  : true,   // false for a classic / local-only project
             'count'    : 0,
             'can_save' : false,
             'connection_label'  : '',
@@ -89,6 +90,7 @@ export default {
             vm.get ('editorial/status.json')
                 .then ((response) => {
                     const d = response.data.data || response.data;
+                    vm.enabled  = d.enabled !== false;  // hidden for local-only
                     vm.count    = d.count || 0;
                     vm.can_save = !!d.can_save;
                     vm.connection_label  = d.connection_label || '';

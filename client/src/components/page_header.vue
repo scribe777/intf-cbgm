@@ -28,10 +28,22 @@
             >{{ link.desc }}</b-dropdown-item
           >
         </b-nav-item-dropdown>
+        <!-- Classic local-only deployment (no VMRCRE backends): local accounts
+             in the instance DB; sign in/out via flask_user, exactly as before
+             the VMRCRE integration.  See vmrcre/CONNECTIONS.md. -->
+        <template v-if="connections.length === 0">
+          <b-nav-item v-if="is_logged_in === false" style="position: absolute; right:0;" href="/user/sign-in"
+            >Log In</b-nav-item
+          >
+          <b-nav-item v-else style="position: absolute; right:0;" href="/user/sign-out"
+            >{{ current_user.username }} (Log Out)</b-nav-item
+          >
+        </template>
+
         <!-- Multiple VMRCRE backends: a "Connect to..." menu to switch between
              them.  See vmrcre/CONNECTIONS.md. -->
         <b-nav-item-dropdown
-          v-if="connections.length > 1"
+          v-else-if="connections.length > 1"
           :text="connect_label"
           right
           style="position: absolute; right:0;"

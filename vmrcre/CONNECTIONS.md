@@ -60,6 +60,31 @@ active connection.
 menu in the page header; the active connection's `api_url` replaces the single
 `window.vmrcre_api_url` for the SSO probe/redirect, login link, and site link.
 
+## Classic local-only deployment (`CBGM_LOCAL_ONLY`)
+
+INTF still hosts shared CBGM instances for teams who don't run Docker on their
+own laptop. There the **instance's own Postgres DB is the source of truth** for
+the editorial work, users have **local accounts in that DB** (managed by
+`flask_user` / `scripts/cceh/mk_users`), and rights/roles come from the DB —
+i.e. exactly how the tool worked before the VMRCRE integration (Liferay never
+authenticated anything). This must keep working.
+
+Set `CBGM_LOCAL_ONLY=true` to get it:
+- `login.connections()` returns `[]` → no active connection → **no SSO**, **no
+  "Connect to…" menu**; the home page lists **only the loaded `.conf` instances**
+  (the existing standalone path).
+- The header reverts to the classic `flask_user` affordance — `/user/sign-in`
+  when logged out, `username (Log Out)` → `/user/sign-out` when logged in.
+- The editorial-sync layer is off: `login.editorial_sync_enabled()` is False
+  (it requires a `VMRCRE_PROJECT_ID` *and* not `CBGM_LOCAL_ONLY`), so
+  `sync_status` hides, the outbox `on_edit` hook no-ops, and
+  `editorial/save|sync` short-circuit. Editing writes locstem straight to the
+  local pg DB, authoritative, gated by the classic `WRITE_ACCESS`/roles.
+
+The local-account auth path (`flask_user.UserManager` + the flask-login session
+loader) is untouched by the VMRCRE work, so it is available regardless of the
+flag; `CBGM_LOCAL_ONLY` just removes the VMRCRE/SSO surface on top of it.
+
 ## Behaviour matrix
 
 | State | Project list | Editing |
