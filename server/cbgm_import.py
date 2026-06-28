@@ -479,7 +479,15 @@ def _worker(app, pid, object_part, name, meta=None):
             _set(pid, state='importing', message='connecting')
             conn = _pg_connect(cfg, dbname)
             ni = _importer_module()
-            api = cfg.get('VMRCRE_API_URL', ni.DEFAULT_API_URL)
+            # Import from the backend the user was connected to when they hit
+            # Start (captured into meta in the request handler, where the
+            # cbgmConnection cookie is readable).  This worker runs in a thread
+            # with no request context, so login.active_connection() can't see
+            # the cookie here -- falling back to the static VMRCRE_API_URL would
+            # import a non-default-backend project (e.g. a CoptOT project) from
+            # the wrong VMRCRE.  See vmrcre/CONNECTIONS.md.
+            api = ((meta or {}).get('connection_api_url')
+                   or cfg.get('VMRCRE_API_URL', ni.DEFAULT_API_URL))
             delay = float(cfg.get('CBGM_IMPORT_DELAY', 0.5))
             importer = ni.Importer(conn, api, '-1', delay=delay)
 
@@ -528,11 +536,13 @@ def _worker_dump(app, pid, name, dump_path, object_part, meta=None, local=False)
             _set(pid, state='restoring', message='restoring dump')
             _pg_restore(cfg, dbname, dump_path)
 
-            # Older dumps type labez as varchar(3); widen so the tool/editor and
-            # our per-verse backup handle longer sub-reading labels.
+            # A dump captures the schema as it was when dumped, so an old dump
+            # restores OLD tables (narrow labez, no books.testament, ...).  Run
+            # the full idempotent schema upgrade so a dump-loaded project matches
+            # what the current app/editor expect, regardless of the dump's age.
             conn = _pg_connect(cfg, dbname)
             try:
-                _importer_module().Importer(conn, '', '-1').widen_labez_columns()
+                _importer_module().Importer(conn, '', '-1').upgrade_schema()
             finally:
                 conn.close()
 

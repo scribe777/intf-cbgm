@@ -33,19 +33,13 @@ import flask_login
 
 import login  # vmrcre_service_request
 from helpers import make_json_response, Passage
+from ntg_common import tools
 
 bp = flask.Blueprint('cbgm_backup', __name__)
 log = logging.getLogger(__name__)
 
 EDITS_KEY_PREFIX = 'cbgm/edits/'
 EDITS_SUBKEY = 'data'
-
-# CBGM book id (1=Matthew .. 27=Revelation) -> OSIS book code, for display refs.
-OSIS_BOOKS = [
-    None, 'Matt', 'Mark', 'Luke', 'John', 'Acts', 'Rom', '1Cor', '2Cor', 'Gal',
-    'Eph', 'Phil', 'Col', '1Thess', '2Thess', '1Tim', '2Tim', 'Titus', 'Phlm',
-    'Heb', 'Jas', '1Pet', '2Pet', '1John', '2John', '3John', 'Jude', 'Rev',
-]
 
 _timers = {}     # (pid, begadr, endadr, user) -> debounce Timer
 _lock = threading.Lock()
@@ -61,12 +55,16 @@ def verse_base(begadr):
 
 
 def verse_ref(begadr):
-    """OSIS-ish verse reference for an address, e.g. '1Tim.1.5' (display only)."""
+    """OSIS-ish verse reference for an address, e.g. 'Mt.1.5' (display only).
+
+    Address layout: bk_id (tbbb) * 10^9 + chapter * 10^6 + verse * 10^3 + word.
+    """
     base = verse_base(begadr)
-    book = base // 10000000
-    chapter = (base // 100000) % 100
-    verse = (base // 1000) % 100
-    name = OSIS_BOOKS[book] if 0 < book < len(OSIS_BOOKS) else ('Bk%d' % book)
+    book = base // 1000000000
+    chapter = (base // 1000000) % 1000
+    verse = (base // 1000) % 1000
+    b = tools.get_book_by_id(book)
+    name = b[1] if b else ('Bk%d' % book)
     return '%s.%d.%d' % (name, chapter, verse)
 
 

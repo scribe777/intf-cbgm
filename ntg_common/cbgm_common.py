@@ -91,9 +91,15 @@ def create_labez_matrix (dba, parameters, val):
 
         np.set_printoptions (threshold = 30)
 
-        # get passages
+        # Size every matrix by MAX(pass_id), NOT COUNT(*).  pass_ids may have
+        # gaps -- a verse that fails to import leaves a hole -- and the matrices
+        # are indexed directly by (pass_id - 1), with the per-range bounds below
+        # (val.ranges) running up to MAX(pass_id).  A count-sized array overflows
+        # on the first gap (the original "index N out of bounds for size N").
+        # Gap columns are masked out via passage_exists (below) so they add no
+        # phantom agreements to the coherence counts.
         res = execute (conn, """
-        SELECT count (*)
+        SELECT COALESCE (MAX (pass_id), 0)
         FROM passages
         """, parameters)
         val.n_passages = res.fetchone ()[0]
@@ -159,9 +165,22 @@ def create_labez_matrix (dba, parameters, val):
 
         val.labez_matrix = labez_matrix
 
+        # Mark which pass_ids actually exist.  Because labez_matrix defaults to
+        # 'a', a gap (missing pass_id) column would otherwise read as "every ms
+        # agrees on a" and pad every pair's agreement count; masking it out of
+        # def_matrix makes gap passages contribute nothing.
+        passage_exists = np.zeros ((1, val.n_passages), np.bool_)
+        res = execute (conn, """
+        SELECT pass_id - 1
+        FROM passages
+        """, parameters)
+        for row in res:
+            passage_exists [0, row[0]] = True
+
         # Boolean matrix ms x pass set where passage is defined
         val.def_matrix = np.greater (val.labez_matrix, 0)
         val.def_matrix = np.logical_and (val.def_matrix, val.variant_matrix) # mask invariant passages
+        val.def_matrix = np.logical_and (val.def_matrix, passage_exists)     # mask gap passages
 
         log (logging.INFO, '  Size of the labez matrix: ' + str (val.labez_matrix.shape))
 

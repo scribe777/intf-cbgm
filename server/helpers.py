@@ -133,18 +133,20 @@ class Word ():
     RE_HR_WORD = re.compile (r'^(?:(\d?\w+)\s+)?(?:(\d+):)?(?:(\d+)/)?(\d+)$')
 
     def __init__ (self, w = 0):
+        # Address layout: bk_id (tbbb) * 10^9 + chapter * 10^6 + verse * 10^3 +
+        # word.  chapter and verse are 3 digits each (see ntg_common.db adr2*).
         w = int (w)
         self.word    = w % 1000
         w //= 1000
-        self.verse   = w % 100
-        w //= 100
-        self.chapter = w % 100
-        w //= 100
+        self.verse   = w % 1000
+        w //= 1000
+        self.chapter = w % 1000
+        w //= 1000
         self.book    = w
 
 
     def __str__ (self):
-        return str (10000000 * self.book + 100000 * self.chapter + 1000 * self.verse + self.word)
+        return str (1000000000 * self.book + 1000000 * self.chapter + 1000 * self.verse + self.word)
 
 
     def parse (self, s):
