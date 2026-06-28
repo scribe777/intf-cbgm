@@ -200,6 +200,8 @@ const store = new Vuex.Store({
     // See vmrcre/CONNECTIONS.md.
     connections: [],
     active_connection_id: null,
+    // Whether to offer "Load a CBGM dump (work locally)".  See CONNECTIONS.md.
+    local_dump_enabled: false,
     current_application: {
       ...default_application
     },
@@ -215,6 +217,7 @@ const store = new Vuex.Store({
     connections(state, data) {
       state.connections = (data && data.connections) || [];
       state.active_connection_id = (data && data.active) || null;
+      state.local_dump_enabled = !!(data && data.local_dump);
     },
     api_url(state, data) {
       state.api_url = data;
@@ -246,6 +249,7 @@ const store = new Vuex.Store({
     active_connection: (state) =>
       state.connections.find((c) => c.id === state.active_connection_id) ||
       null,
+    local_dump_enabled: (state) => state.local_dump_enabled,
     route_meta: (state) => state.route_meta,
     ranges: (state) => state.ranges,
     current_application: (state) => state.current_application,

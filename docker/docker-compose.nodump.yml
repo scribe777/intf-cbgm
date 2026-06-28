@@ -1,0 +1,6 @@
+# Scenario override: connected (LOCAL_ONLY off) but CBGM_ALLOW_LOCAL_DUMP=false
+# (a hosted connected instance that forbids ad-hoc local dumps).
+services:
+  cbgm-app-server:
+    environment:
+      CBGM_ALLOW_LOCAL_DUMP: "false"

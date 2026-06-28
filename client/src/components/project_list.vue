@@ -45,6 +45,24 @@
         style="display: none"
         @change="dump_selected"
       />
+      <input
+        ref="local_dump_input"
+        type="file"
+        style="display: none"
+        @change="local_dump_selected"
+      />
+      <p v-if="local_dump_enabled">
+        <button
+          class="btn btn-outline-primary btn-sm"
+          @click="pick_local_dump"
+        >
+          Load a CBGM dump file (work locally)&hellip;
+        </button>
+        <span class="text-muted" style="margin-left: 0.5rem;">
+          Open your own CBGM database dump and work on it locally &mdash;
+          nothing is saved back to any VMRCRE.
+        </span>
+      </p>
       <p v-if="offline && projects.length" class="text-muted">
         <em>Offline</em> &mdash; showing the projects already loaded on this
         computer. <a :href="vmrcre_login_url">Log in</a> when you're back online
@@ -70,7 +88,11 @@
           >
             <td colspan="5">
               <span class="conn-badge">{{ g.label }}</span>
-              <span v-if="!g.active" class="text-muted conn-note">
+              <span v-if="g.local" class="text-muted conn-note">
+                &mdash; loaded from a dump; edited locally, not saved to any
+                VMRCRE
+              </span>
+              <span v-else-if="!g.active" class="text-muted conn-note">
                 &mdash; read-only here; choose &ldquo;{{ g.label }}&rdquo; in
                 <em>Connect to&hellip;</em> to save back
               </span>
@@ -300,7 +322,7 @@ export default {
     };
   },
   computed: {
-    ...mapGetters(["is_logged_in", "active_connection"]),
+    ...mapGetters(["is_logged_in", "active_connection", "local_dump_enabled"]),
     // Group the project list by source backend, active connection first.  See
     // vmrcre/CONNECTIONS.md.
     grouped_projects: function() {
@@ -314,6 +336,8 @@ export default {
             id: id,
             label: p.connection_label || "VMRCRE",
             active: id === active_id,
+            // Local (dump-loaded) projects have no backend to "reconnect to".
+            local: !!p.local || id === "__local__",
             projects: []
           };
           groups.push(index[id]);
@@ -430,6 +454,73 @@ export default {
           });
       }
       upload(false);
+    },
+    // Load a user's own CBGM dump as a NEW purely-local project (no VMRCRE).
+    // Unlike pick_dump/dump_selected (which reload INTO an existing project
+    // row), this needs no login and no existing project.  See CONNECTIONS.md.
+    pick_local_dump: function() {
+      this.$refs.local_dump_input.click();
+    },
+    local_dump_selected: function(e) {
+      const vm = this;
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      const suggested = file.name.replace(/\.(dump|sql|backup|pgdump)$/i, "");
+      const name = window.prompt("Name for this local project:", suggested);
+      if (name === null) return; // cancelled
+
+      // A temporary row so the user sees upload/restore progress right away; it
+      // adopts the server-assigned id, and is replaced by the real row when the
+      // finished import reloads the list.
+      const placeholder = {
+        project_id: "pending-" + Date.now(),
+        name: name || "Local project",
+        object_part: "",
+        user_group: "",
+        connection_id: "__local__",
+        connection_label: "Local",
+        local: true,
+        instance_root: null,
+        import: {
+          state: "provisioning",
+          message: "uploading dump",
+          done: 0,
+          total: 0
+        }
+      };
+      vm.projects.push(placeholder);
+
+      const fd = new FormData();
+      fd.append("dump", file);
+      fd.append("name", name || "Local project");
+      axios
+        .post(url.resolve(window.api_base_url, "load_local_dump.json"), fd)
+        .then(function(r) {
+          const d = (r.data && r.data.data) || r.data || {};
+          if (d.started === false) {
+            vm.$set(placeholder, "import", {
+              state: "error",
+              message: d.error || "could not load dump"
+            });
+            return;
+          }
+          // Match the server's id so import_status polling finds it.
+          placeholder.project_id = String(d.pid);
+          if (d.status) vm.$set(placeholder, "import", d.status);
+          vm.ensure_polling();
+        })
+        .catch(function(err) {
+          vm.$set(placeholder, "import", {
+            state: "error",
+            message:
+              (err.response &&
+                (err.response.data &&
+                  err.response.data.error)) ||
+              (err.response && err.response.statusText) ||
+              "upload failed"
+          });
+        });
     },
     reload_ntvmr: function(p) {
       this.menu_open = null;

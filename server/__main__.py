@@ -109,6 +109,16 @@ class Config ():
     # See vmrcre/CONNECTIONS.md.
     CBGM_LOCAL_ONLY = os.environ.get(
         'CBGM_LOCAL_ONLY', '').lower() in ('1', 'true', 'yes')
+    # Allow an (even anonymous) user to load their own CBGM dump file as a purely
+    # local project -- the "download the image, don't log in to any VMRCRE, work
+    # on my dump" workbench case.  Such projects carry no VMRCRE_PROJECT_ID /
+    # CONNECTION_ID, so editorial sync is permanently off for them.
+    # Default = NOT CBGM_LOCAL_ONLY: a locked-down preloaded shared instance
+    # never wants ad-hoc dumps, but every other deploy (incl. a connections-off
+    # standalone project image) does.  Set explicitly to override either way.
+    CBGM_ALLOW_LOCAL_DUMP = os.environ.get(
+        'CBGM_ALLOW_LOCAL_DUMP',
+        'false' if CBGM_LOCAL_ONLY else 'true').lower() in ('1', 'true', 'yes')
     VMRCRE_SESSION_COOKIE = os.environ.get('VMRCRE_SESSION_COOKIE', 'vmrcreSession')
     VMRCRE_ROLE_PREFIX = os.environ.get('VMRCRE_ROLE_PREFIX', 'CBGM ')
     VMRCRE_PROJECT_NAME = None

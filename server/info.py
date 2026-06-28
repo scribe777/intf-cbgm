@@ -10,10 +10,15 @@ import flask_login
 
 from helpers import make_json_response
 from login import (user_can_read, user_can_write, vmrcre_service_request,
-                   vmrcre_reachable, connections, active_connection)
+                   vmrcre_reachable, connections, active_connection,
+                   local_dump_enabled)
 from cbgm_import import get_status
 
 bp = flask.Blueprint('info', __name__)
+
+# Sentinel "connection" for purely local, dump-loaded projects (no VMRCRE
+# backing).  Groups them under "Local" in the project list; never a real backend.
+LOCAL_CONNECTION_ID = '__local__'
 
 instances = collections.OrderedDict()
 
@@ -51,6 +56,8 @@ def connections_json():
     return make_json_response({
         'connections': connections(current_app.config),
         'active': active.get('id') if active else None,
+        # Whether to offer the "Load a CBGM dump (work locally)" action.
+        'local_dump': local_dump_enabled(current_app.config),
     })
 
 
@@ -149,15 +156,26 @@ def _projects_from_instances():
     for inst in instances.values():
         c = inst.config
         pid = c.get('VMRCRE_PROJECT_ID')
-        if not pid:
+        # Purely local, dump-loaded projects have no VMRCRE_PROJECT_ID; they are
+        # marked with CBGM_LOCAL_PROJECT and keyed by their CBGM_LOCAL_ID.
+        is_local = not pid and c.get('CBGM_LOCAL_PROJECT')
+        if not pid and not is_local:
             continue
-        cid = c.get('CONNECTION_ID') or ''
-        # Legacy imports predate CONNECTION_ID; they were all NTVMR.
-        label = (reg.get(cid) or {}).get('label') or ('NTVMR' if not cid else cid)
+        if is_local:
+            pid = c.get('CBGM_LOCAL_ID') or ''
+            cid = LOCAL_CONNECTION_ID
+            label = 'Local'
+        else:
+            cid = c.get('CONNECTION_ID') or ''
+            # Legacy imports predate CONNECTION_ID; they were all NTVMR.
+            label = (reg.get(cid) or {}).get('label') or ('NTVMR' if not cid else cid)
         root_path = c.get('APPLICATION_DIR', c.get('APPLICATION_ROOT', ''))
         rows.append({
             'project_id': str(pid),
-            'name': c.get('VMRCRE_PROJECT_NAME', c.get('APPLICATION_NAME', '')),
+            # `or` not get-default: Config defines VMRCRE_PROJECT_NAME=None, so
+            # the key is present-but-None on a local project's app (no default
+            # kicks in) -- fall back to APPLICATION_NAME for the display name.
+            'name': c.get('VMRCRE_PROJECT_NAME') or c.get('APPLICATION_NAME', ''),
             'object_part': c.get('BOOK', ''),
             'task_type_id': c.get('VMRCRE_TASK_TYPE_ID', ''),
             'user_group': c.get('VMRCRE_USER_GROUP', ''),
@@ -166,6 +184,7 @@ def _projects_from_instances():
             'import': get_status(pid),
             'connection_id': cid,
             'connection_label': label,
+            'local': bool(is_local),
         })
     return rows
 

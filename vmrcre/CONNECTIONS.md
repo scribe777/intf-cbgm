@@ -85,6 +85,36 @@ The local-account auth path (`flask_user.UserManager` + the flask-login session
 loader) is untouched by the VMRCRE work, so it is available regardless of the
 flag; `CBGM_LOCAL_ONLY` just removes the VMRCRE/SSO surface on top of it.
 
+## Local dump workbench (`CBGM_ALLOW_LOCAL_DUMP`)
+
+A user can download the image, **not log in to any VMRCRE**, load their own CBGM
+database dump, and work on it locally — the tool as a pure local workbench,
+available even from the connected image. This is orthogonal to the connection
+axis: a deploy can be connected *and* allow local dumps.
+
+`CBGM_ALLOW_LOCAL_DUMP` gates it. **Default = `!CBGM_LOCAL_ONLY`**: a locked-down
+preloaded shared instance never wants ad-hoc dumps, but every other deploy (the
+laptop image, or a non-VMRCRE project that hosts our image with connections off)
+does. Set it explicitly to override either way.
+
+- The home page shows a **"Load a CBGM dump file (work locally)…"** button
+  whenever the flag is on — independent of any project row, so it works when the
+  list is empty and **with no login** (the route checks the flag, not
+  `is_authenticated`; unlike per-project `load_dump` which still gates on
+  `_require_can_start`).
+- `POST load_local_dump.json` (pid-less) allocates a **reserved local id**
+  (`LOCAL_PID_BASE = 900000`+, scanned free against existing `cbgm_proj_*.conf`
+  and in-flight reservations under the status lock), restores the dump into
+  `cbgm_proj_<id>`, and writes a **no-VMRCRE `.conf`**
+  (`_write_local_instance_conf`): no `VMRCRE_PROJECT_ID` / `CONNECTION_ID`, plus
+  `CBGM_LOCAL_PROJECT="1"` + `CBGM_LOCAL_ID`, `WRITE_ACCESS=public` so a
+  not-logged-in user can edit their own copy.
+- Because there is no `VMRCRE_PROJECT_ID`, `login.editorial_sync_enabled()` is
+  False → no outbox, no "reconnect to save"; the local pg DB is the only home for
+  the work. The project list groups these under a **"Local"** badge with
+  "loaded from a dump; edited locally, not saved to any VMRCRE" (no read-only
+  note — there is no backend to reconnect to).
+
 ## Behaviour matrix
 
 | State | Project list | Editing |
@@ -92,6 +122,7 @@ flag; `CBGM_LOCAL_ONLY` just removes the VMRCRE/SSO surface on top of it.
 | Not connected (no default) | locally-mounted only, grouped by origin | offline rules (conf identity) |
 | Connected + online | active backend live list + all mounted, grouped/badged | active: full; others: reconnect-to-save |
 | Connected + offline | all mounted, grouped | conf identity per project |
+| Local dump (any state) | "Local" group, no backend | full local editing, never synced |
 
 ## Phasing
 

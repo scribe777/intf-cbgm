@@ -15,6 +15,7 @@ for progress.  See vmrcre/README.md.
 
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import threading
@@ -62,6 +63,11 @@ def get_status(pid=None):
         return dict(_status.get(str(pid), {}))
 
 
+# Purely local, dump-loaded projects (no VMRCRE backing) get ids from here up.
+# Well above any real VMRCRE projectID, so a local id never collides with one.
+LOCAL_PID_BASE = 900000
+
+
 def _safe_pid(pid):
     """A project id is a numeric NTVMR projectID.  Refuse anything else so it
     can never break out of a quoted SQL identifier (the CREATE/DROP DATABASE
@@ -71,6 +77,45 @@ def _safe_pid(pid):
     if not s.isdigit():
         raise ValueError('invalid project id: %r' % (pid,))
     return s
+
+
+def _instance_dir(cfg):
+    """The persistable projects dir where instance .confs live."""
+    return (cfg.get('CBGM_PROJECTS_DIR')
+            or cfg.get('INSTANCE_DIR') or os.path.abspath('instance'))
+
+
+def _existing_conf_pids(cfg):
+    """Numeric ids of every provisioned project DB, read from the
+    cbgm_proj_<id>.conf filenames, so a freshly allocated local id never
+    collides with an existing database / mount."""
+    pids = set()
+    try:
+        names = os.listdir(_instance_dir(cfg))
+    except OSError:
+        return pids
+    for fn in names:
+        m = re.match(r'cbgm_proj_(\d+)\.conf$', fn)
+        if m:
+            pids.add(int(m.group(1)))
+    return pids
+
+
+def _alloc_local_pid(cfg):
+    """Reserve a fresh local-project id (>= LOCAL_PID_BASE) for a dump-loaded
+    local project.  Avoids existing DBs and in-flight allocations, and reserves
+    the id under the status lock so two concurrent uploads can't pick the same
+    one."""
+    with _lock:
+        used = _existing_conf_pids(cfg)
+        used.update(int(k) for k in _status.keys() if str(k).isdigit())
+        pid = LOCAL_PID_BASE
+        while pid in used:
+            pid += 1
+        # Reserve immediately (hold the lock; don't call _set -> would re-lock).
+        _status.setdefault(str(pid), {}).update(
+            state='provisioning', done=0, total=0, message='reserved')
+        return pid
 
 
 def db_name_for(pid):
@@ -247,9 +292,7 @@ def _pg_restore(cfg, dbname, dump_path):
 def _conf_path_for(cfg, dbname):
     """Path of a project's instance .conf (in the persistable projects dir)."""
 
-    instance_dir = (cfg.get('CBGM_PROJECTS_DIR')
-                    or cfg.get('INSTANCE_DIR') or os.path.abspath('instance'))
-    return os.path.join(instance_dir, '%s.conf' % dbname)
+    return os.path.join(_instance_dir(cfg), '%s.conf' % dbname)
 
 
 def _conf_quote(val):
@@ -383,6 +426,47 @@ def _write_instance_conf(cfg, pid, name, dbname, object_part,
     return path
 
 
+def _write_local_instance_conf(cfg, pid, name, dbname, object_part=''):
+    """Write an instance .conf for a purely local, dump-loaded project (no VMRCRE
+    backing).  Deliberately carries NO VMRCRE_PROJECT_ID / CONNECTION_ID, so the
+    instance never binds to a backend and editorial sync stays off
+    (login.editorial_sync_enabled); CBGM_LOCAL_PROJECT marks it for the project
+    list and CBGM_LOCAL_ID keys it.  WRITE_ACCESS defaults to public so a
+    not-logged-in user can edit their own local copy.  See vmrcre/CONNECTIONS.md.
+    """
+
+    path = _conf_path_for(cfg, dbname)
+    instance_dir = os.path.dirname(path)
+    if not os.path.isdir(instance_dir):
+        os.makedirs(instance_dir, exist_ok=True)
+    conf = (
+        'APPLICATION_NAME="%(name)s"\n'
+        'APPLICATION_ROOT="%(root)s"\n'
+        'BOOK="%(book)s"\n'
+        'READ_ACCESS="public"\n'
+        'READ_ACCESS_PRIVATE="Reviewer"\n'
+        'WRITE_ACCESS="%(write)s"\n'
+        # Purely local project loaded from a user's own CBGM dump -- not backed
+        # by any VMRCRE.  No VMRCRE_PROJECT_ID / CONNECTION_ID => no SSO binding
+        # and no editorial sync; CBGM_LOCAL_PROJECT lists it under "Local".
+        'CBGM_LOCAL_PROJECT="1"\n'
+        'CBGM_LOCAL_ID="%(pid)s"\n'
+        'PGHOST="%(host)s"\n'
+        'PGPORT="%(port)s"\n'
+        'PGUSER="%(user)s"\n'
+        'PGDATABASE="%(db)s"\n'
+    ) % {
+        'name': _conf_quote(name), 'root': app_root_for(pid),
+        'book': object_part, 'pid': _safe_pid(pid),
+        'host': cfg['PGHOST'], 'port': cfg.get('PGPORT', 5432),
+        'user': cfg['PGUSER'], 'db': dbname,
+        'write': cfg.get('CBGM_PROJECT_WRITE_ACCESS', 'public'),
+    }
+    with open(path, 'w') as fp:
+        fp.write(conf)
+    return path
+
+
 def _worker(app, pid, object_part, name, meta=None):
     with app.app_context():
         cfg = current_app.config
@@ -425,9 +509,13 @@ def _worker(app, pid, object_part, name, meta=None):
             _set(pid, state='error', message=str(e))
 
 
-def _worker_dump(app, pid, name, dump_path, object_part, meta=None):
+def _worker_dump(app, pid, name, dump_path, object_part, meta=None, local=False):
     """Load an existing CBGM database from an uploaded dump (e.g. an ITSEE/old
-    docker-image apparatus not present in the NTVMR)."""
+    docker-image apparatus not present in the NTVMR).
+
+    local=True writes a no-VMRCRE local-project .conf (see
+    _write_local_instance_conf); otherwise the project is bound to the backend
+    captured in meta."""
 
     with app.app_context():
         cfg = current_app.config
@@ -448,8 +536,12 @@ def _worker_dump(app, pid, name, dump_path, object_part, meta=None):
             finally:
                 conn.close()
 
-            conf_path = _write_instance_conf(cfg, pid, name, dbname,
-                                             object_part, **(meta or {}))
+            if local:
+                conf_path = _write_local_instance_conf(
+                    cfg, pid, name, dbname, object_part)
+            else:
+                conf_path = _write_instance_conf(cfg, pid, name, dbname,
+                                                 object_part, **(meta or {}))
             try:
                 import __main__ as server_main
                 if hasattr(server_main, 'mount_instance'):
@@ -562,6 +654,42 @@ def load_dump(pid):
         daemon=True)
     t.start()
     return make_json_response({'started': True, 'status': get_status(pid)})
+
+
+@bp.route('/load_local_dump.json', methods=['POST', 'OPTIONS'])
+def load_local_dump():
+    """Endpoint.  Load a user's own CBGM dump file as a purely local project,
+    with no VMRCRE backing -- the "download the image, don't log in, work on my
+    own dump" case.  No login required; gated only by CBGM_ALLOW_LOCAL_DUMP
+    (default !CBGM_LOCAL_ONLY).  The new project gets a reserved local id, a
+    no-VMRCRE .conf, and is mounted live.  See vmrcre/CONNECTIONS.md."""
+
+    if request.method == 'OPTIONS':
+        return make_json_response({})
+    if not current_app.config.get('CBGM_ALLOW_LOCAL_DUMP'):
+        raise PrivilegeError('Loading a local dump is disabled on this server.')
+
+    f = request.files.get('dump')
+    if f is None:
+        return make_json_response({'started': False, 'error': 'no dump file'})
+    name = request.values.get('name') or 'Local project'
+    object_part = request.values.get('object_part', '')
+
+    pid = _alloc_local_pid(current_app.config)
+
+    fd, tmp = tempfile.mkstemp(suffix='.dump')
+    os.close(fd)
+    f.save(tmp)
+
+    _set(pid, state='provisioning', done=0, total=0, name=name, message='uploaded')
+    t = threading.Thread(
+        target=_worker_dump,
+        args=(current_app._get_current_object(), pid, name, tmp, object_part),
+        kwargs={'local': True},
+        daemon=True)
+    t.start()
+    return make_json_response(
+        {'started': True, 'pid': pid, 'status': get_status(pid)})
 
 
 @bp.route('/projects/<int:pid>/start.json', methods=['POST', 'OPTIONS'])

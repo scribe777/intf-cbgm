@@ -242,6 +242,16 @@ def editorial_sync_enabled ():
     return bool (config.get ('VMRCRE_PROJECT_ID')) and not config.get ('CBGM_LOCAL_ONLY')
 
 
+def local_dump_enabled (config):
+    """True if a user (even an anonymous one) may load their own CBGM dump file
+    as a purely local project -- the "download the image, don't log in to any
+    VMRCRE, work on my own dump" workbench case.  Such projects carry no
+    VMRCRE_PROJECT_ID / CONNECTION_ID, so editorial sync is permanently off for
+    them.  Gated by CBGM_ALLOW_LOCAL_DUMP (defaults to NOT CBGM_LOCAL_ONLY).
+    See vmrcre/CONNECTIONS.md."""
+    return bool (config.get ('CBGM_ALLOW_LOCAL_DUMP'))
+
+
 def instance_is_active ():
     """For a project instance app: True if its bound backend is the one the user
     is currently connected to.  When it is NOT, a save to the VMRCRE won't
