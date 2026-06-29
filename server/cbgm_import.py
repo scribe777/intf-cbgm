@@ -495,7 +495,7 @@ def _worker(app, pid, object_part, name, meta=None):
                 _set(pid, state='importing', done=done, total=total,
                      message=message)
 
-            importer.import_project(object_part, progress=progress)
+            importer.import_project(object_part, pid, progress=progress)
             conn.close()
 
             conf_path = _write_instance_conf(cfg, pid, name, dbname,

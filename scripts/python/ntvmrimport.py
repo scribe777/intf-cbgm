@@ -108,10 +108,16 @@ def enumerate_verses(api_url, object_part):
     return verses
 
 
-def fetch_apparatus(api_url, osis_ref, segment_group_id):
-    """Fetch the full (detail=extra) apparatus for one verse."""
+def fetch_apparatus(api_url, osis_ref, segment_group_id, include_baseline=None):
+    """Fetch the full (detail=extra) apparatus for one verse.
 
-    return api_get(api_url, 'variant/apparatus/get', {
+    When include_baseline (the edition base text docID) is given, the response's
+    <segments> root carries a baselineReading attribute -- the edition's running
+    text for the verse, pipe-delimited per word -- which becomes the Leitzeile
+    (nestle table).
+    """
+
+    params = {
         'indexContent': osis_ref,
         'segmentGroupID': segment_group_id,
         'detail': 'extra',
@@ -122,7 +128,10 @@ def fetch_apparatus(api_url, osis_ref, segment_group_id):
         # parent labez and avoids two readings sharing identical lesart text
         # (which collides on the readings_unique_pass_id_lesart constraint).
         'breakoutSublabelReadings': 'false',
-    })
+    }
+    if include_baseline:
+        params['includeBaseline'] = include_baseline
+    return api_get(api_url, 'variant/apparatus/get', params)
 
 
 # --------------------------------------------------------------------------- #
@@ -204,6 +213,10 @@ class Importer:
         self.segment_group_id = segment_group_id
         self.delay = delay      # polite pause between verses (avoid fail2ban)
         self._books_seen = set()
+        # The edition base text docID ('Edition Basetext Default'); set in
+        # import_project from the project config.  Drives the apparatus
+        # includeBaseline parameter and the nestle (Leitzeile) population.
+        self.edition_base = None
 
     def execute(self, sql, args=None):
         cur = self.conn.cursor()
@@ -671,6 +684,49 @@ class Importer:
         """)
         self.conn.commit()
 
+    # -- edition base text (Leitzeile / nestle) ---------------------------- #
+
+    def fetch_edition_base(self, project_id):
+        """Return the project's 'Edition Basetext Default' (the edition docID
+        whose running text becomes the Leitzeile / nestle table).
+
+        Raises ValueError if it is not configured -- without it there is no
+        edition text to import, and the apparatus display has no base line.
+        """
+        root = api_get(self.api_url, 'projectmanagement/project/get',
+                       {'projectID': project_id, 'detail': 'documents'})
+        project = root.find('.//project')
+        edition = project.get('editionBaseDefault') if project is not None else None
+        if not edition or edition == '0':
+            raise ValueError(
+                "'Edition Basetext Default' is not set in this project's "
+                "configuration.")
+        return edition
+
+    def populate_nestle(self, base, baseline_reading):
+        """Populate the edition (Leitzeile) text for one verse into nestle.
+
+        baseline_reading is the apparatus' baselineReading attribute: the edition
+        words for the verse, pipe-delimited.  Edition words sit at even word
+        addresses (word i -> base + 2*i; odd addresses are the between-word
+        insertion points).  Idempotent: clears this verse's rows first.
+        """
+        self.execute("DELETE FROM nestle WHERE begadr >= %s AND begadr < %s",
+                     (base, base + 1000))
+        if not baseline_reading:
+            return 0
+        n = 0
+        for i, word in enumerate(baseline_reading.split('|'), 1):
+            if not word:
+                continue
+            adr = base + 2 * i
+            self.execute(
+                "INSERT INTO nestle (begadr, endadr, passage, lemma)"
+                " VALUES (%s, %s, int8range(%s, %s), %s)",
+                (adr, adr, adr, adr + 1, word))
+            n += 1
+        return n
+
     # -- top level --------------------------------------------------------- #
 
     def import_verse(self, osis_ref, verse_hash):
@@ -680,7 +736,10 @@ class Importer:
         bk_id = cbgm_book_id(testament, book)
         base = verse_base_address(bk_id, chapter, verse)
 
-        root = fetch_apparatus(self.api_url, osis_ref, self.segment_group_id)
+        root = fetch_apparatus(self.api_url, osis_ref, self.segment_group_id,
+                               self.edition_base)
+        # Edition (Leitzeile) text for this verse, from the apparatus baseline.
+        self.populate_nestle(base, root.get('baselineReading'))
         n_seg = 0
         n_wit = 0
         seen_passages = set()
@@ -753,8 +812,13 @@ class Importer:
         self.conn.commit()
         return n_seg, n_wit
 
-    def import_project(self, object_part, progress=None):
+    def import_project(self, object_part, project_id, progress=None):
         """Import a whole project.
+
+        project_id is the NTVMR projectID; its 'Edition Basetext Default' is
+        required (it supplies the Leitzeile/edition text) and is validated up
+        front, before any database work, so a misconfigured project fails fast
+        with a clear message.
 
         progress, if given, is called as progress(done, total, message) after
         the provisioning steps and after each verse, so a caller (e.g. the
@@ -765,6 +829,9 @@ class Importer:
             if progress:
                 progress(done, total, message)
 
+        # Validate + capture the edition base text first: no DB side effects yet,
+        # so an unconfigured project errors out cleanly.
+        self.edition_base = self.fetch_edition_base(project_id)
         report(0, 0, 'preparing database')
         self.upgrade_schema()
         self.ensure_base_manuscripts()
@@ -817,6 +884,9 @@ def build_parser():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--object-part', required=True,
                    help="project objectPart / verse reference, e.g. '1Tim-Titus'")
+    p.add_argument('--project-id', required=True,
+                   help="NTVMR projectID (supplies the 'Edition Basetext "
+                        "Default' / Leitzeile text)")
     p.add_argument('--api-url', default=os.environ.get('VMRCRE_API_URL', DEFAULT_API_URL),
                    help="NTVMR API base url")
     p.add_argument('--segment-group-id', default='-1',
@@ -845,7 +915,7 @@ def main():
         password=args.password, dbname=args.dbname)
     try:
         Importer(conn, args.api_url, args.segment_group_id, args.delay).import_project(
-            args.object_part)
+            args.object_part, args.project_id)
     finally:
         conn.close()
 

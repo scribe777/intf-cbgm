@@ -562,9 +562,57 @@ window.addEventListener("hashchange", function() {
     src: url("../webfonts/metawebpro-bold.woff"); 
   }
 
-@font-face { 
+@font-face {
   font-family: "WWUSymbol";
-  src: url("../webfonts/wwu_symbol.woff"); 
+  src: url("../webfonts/wwu_symbol.woff");
+}
+
+/* Biblical-text webfonts, bundled so the tool renders every versional script a
+   VMRCRE project may contain -- on any backend, offline too.  Ported from the
+   VMRCRE transcript editor's content-extra.css (the /community/fonts set) plus
+   GentiumPlus for Greek/Latin.  Each font covers one script; per-glyph fallback
+   in the stack below renders each character from the first font that has it. */
+@font-face {           /* Greek / Latin */
+  font-family: "GentiumPlus";
+  src: url("../webfonts/GentiumPlus-R.woff") format("woff");
+}
+@font-face {
+  font-family: "GentiumPlus";
+  font-style: italic;
+  src: url("../webfonts/GentiumPlus-I.woff") format("woff");
+}
+@font-face {           /* Coptic (incl. nomina-sacra combining overlines) */
+  font-family: "AntinoouWeb";
+  src: url("../webfonts/antinoou-webfont.woff") format("woff");
+}
+@font-face {           /* Syriac (Estrangelo) */
+  font-family: "EstreWeb";
+  src: url("../webfonts/estre.woff") format("woff");
+}
+@font-face {           /* Old Church Slavonic / Glagolitic */
+  font-family: "BukyvedeWeb";
+  src: url("../webfonts/Bukyvede.woff") format("woff");
+}
+@font-face {           /* Hebrew */
+  font-family: "SBL_HebrewWeb";
+  src: url("../webfonts/sbl_hbrw-webfont.woff2") format("woff2"),
+       url("../webfonts/sbl_hbrw-webfont.woff") format("woff");
+}
+@font-face {           /* Arabic */
+  font-family: "ArabicWeb";
+  src: url("../webfonts/NotoNaskhArabic-Regular.woff2") format("woff2"),
+       url("../webfonts/NotoNaskhArabic-Regular.woff") format("woff");
+  font-display: swap;
+}
+
+/* Apply the multilingual stack to the elements that carry biblical text: the
+   Leitzeile lemmas, the apparatus reading lesart, and the comparison table's
+   lesart cells.  Witness sigla and labez letters stay in the UI font. */
+.vm-leitzeile,
+.apparatus-labez,
+.lesart {
+  font-family: "GentiumPlus", "AntinoouWeb", "EstreWeb", "SBL_HebrewWeb",
+    "ArabicWeb", "BukyvedeWeb", "Arial Unicode MS", serif;
 }
 
 a {
