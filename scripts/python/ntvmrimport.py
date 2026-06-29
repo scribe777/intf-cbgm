@@ -580,8 +580,10 @@ class Importer:
             "INSERT INTO cliques (pass_id, labez) VALUES (%s, %s)"
             " ON CONFLICT DO NOTHING",
             (pass_id, labez))
-        # 'a' is the initial text (source '*'); everything else is unknown ('?').
-        source = '*' if labez == 'a' else '?'
+        # 'a' is the initial text (source '*'); every other reading defaults to
+        # deriving from 'a' so the local stemma is fully decided on import
+        # (editors refine afterwards). Use '?' here instead to leave them open.
+        source = '*' if labez == 'a' else 'a'
         self.execute(
             "INSERT INTO locstem (pass_id, labez, source_labez)"
             " VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
