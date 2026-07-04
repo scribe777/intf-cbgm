@@ -348,6 +348,17 @@ def vmrcre_service_request (service, data, session_hash = None):
         return None
 
 
+def circuit_open ():
+    """True if the NTVMR circuit breaker is currently tripped (assume-down).
+
+    Cheap, no network.  Lets a caller tell 'the NTVMR answered with nothing'
+    (a genuine empty) apart from 'we never reached the NTVMR' (breaker open),
+    so a read like the suggestion list can report unreachable instead of
+    silently looking empty.
+    """
+    return time.monotonic () < _vmrcre_down_until
+
+
 def vmrcre_reachable ():
     """Cheap, breaker-aware check: did the NTVMR answer at all right now?
 

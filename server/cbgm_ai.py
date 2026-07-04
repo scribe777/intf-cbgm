@@ -425,6 +425,7 @@ def suggestions_at (passage_or_id):
         begadr, endadr = int (p.start), int (p.end)
     ref = cbgm_backup.passage_ref (begadr, endadr)
 
+    import login   # for the circuit-breaker state check
     contributors = cbgm_backup.list_segment_contributors (project, ref, sh) if project else []
     suggestions = []
     for c in contributors:
@@ -432,8 +433,16 @@ def suggestions_at (passage_or_id):
             frag = cbgm_backup.get_segment (project, ref, c['producer'], sh, state = 'ai')
             if frag is not None:
                 suggestions.append (dict (frag, producer = c['producer']))
+    # An EMPTY list from an open breaker means "we never reached the NTVMR",
+    # not "nothing is staged here" -- tell the client so it keeps what it has
+    # and retries rather than silently blanking the review rail.  Getting any
+    # contributor proves we reached the store, so only an empty result with the
+    # breaker open counts as unreachable (this avoids a false 'unreachable' when
+    # a later, empty tier probe trips the breaker after the ai read succeeded).
+    # A local-only project (no VMRCRE binding) has nothing remote to reach.
+    reachable = True if not project else (bool (contributors) or not login.circuit_open ())
     return flask.jsonify ({ 'ref': ref, 'contributors': contributors,
-                            'suggestions': suggestions })
+                            'suggestions': suggestions, 'reachable': reachable })
 
 
 @bp.route ('/suggest-stemma/<passage_or_id>', methods = ['POST', 'OPTIONS'])
