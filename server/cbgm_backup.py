@@ -291,8 +291,22 @@ def user_can_save(session_hash):
     return role in login.imported_roles(current_app.config)
 
 
-def put_segment(project_name, ref, fragment, user_name, session_hash, push='false'):
+# Producer tiers a passage's data can live in, mirroring the transcription
+# state legs (see project/data/put's {state}).  Low -> high authority.  'ai' is
+# a machine producer (userName = the model name); 'initial' is a human's working
+# draft (what the apply/overlay flow reads).
+CONTRIBUTOR_TIERS = ('ai', 'initial', 'reconciled', 'published')
+
+
+def put_segment(project_name, ref, fragment, user_name, session_hash,
+                push='false', state='initial'):
     """Write a segment fragment to the NTVMR under its passage reference.
+
+    ``state`` is the producer tier leg (initial|ai|reconciled|published); it
+    lands the data at cbgm/edits/<ref>/<state>/<user_name>/data.txt.  With
+    state='ai' the user_name is a model name and the NTVMR skips its
+    edit-another-user's-data check (machine namespace).  Default 'initial'
+    reproduces the pre-tier path exactly.
 
     Returns the response root, or None on failure (offline / NTVMR
     unreachable).  Default ``push='false'`` batches the git commit locally on
@@ -303,18 +317,32 @@ def put_segment(project_name, ref, fragment, user_name, session_hash, push='fals
     return login.vmrcre_service_request(
         'projectmanagement/project/data/put',
         {'projectName': str(project_name), 'key': EDITS_KEY_PREFIX + ref,
-         'subKey': EDITS_SUBKEY, 'userName': user_name,
+         'subKey': EDITS_SUBKEY, 'userName': user_name, 'state': state,
          'data': json.dumps(fragment), 'push': push},
         session_hash)
 
 
-def get_segment(project_name, ref, user_name, session_hash):
-    """Return a fragment dict for (passage ref, user), or None."""
+def put_suggestion(project_name, ref, fragment, model, session_hash, push='false'):
+    """Write an AI-tier suggestion under the model's name (state='ai').
+
+    The [Suggest Local Stemma] write path: the suggestion is scoped like any
+    contributor's data but in the 'ai' tier, so it shows up next to the human
+    editors and is reviewed (accept/override) rather than auto-applied."""
+
+    return put_segment(project_name, ref, fragment, model, session_hash,
+                       push=push, state='ai')
+
+
+def get_segment(project_name, ref, user_name, session_hash, state='initial'):
+    """Return a fragment dict for (passage ref, producer), or None.
+
+    ``state`` selects the tier leg (default 'initial'); pass state='ai' with
+    user_name = the model name to read a specific AI suggestion."""
 
     root = login.vmrcre_service_request(
         'projectmanagement/project/data/get',
         {'projectName': str(project_name), 'key': EDITS_KEY_PREFIX + ref,
-         'subKey': EDITS_SUBKEY, 'userName': user_name},
+         'subKey': EDITS_SUBKEY, 'userName': user_name, 'state': state},
         session_hash)
     if root is None:
         return None
@@ -350,16 +378,19 @@ def list_all_refs(project_name, session_hash):
     return refs
 
 
-def list_segment_users(project_name, ref, session_hash):
-    """Usernames that have decisions stored at this passage.
+def list_segment_users(project_name, ref, session_hash, state='initial'):
+    """Producer names with decisions stored at this passage in one tier.
 
-    User-scoped data lives at cbgm/edits/<ref>/initial/<user>/data.txt, so the
-    users are the children of <ref>/initial.
+    Data lives at cbgm/edits/<ref>/<state>/<producer>/data.txt, so the producers
+    are the children of <ref>/<state>.  Defaults to 'initial' -- the human
+    working drafts the apply/overlay flow reads; AI suggestions (state='ai') are
+    intentionally NOT read here, so they stay staged rather than auto-applied.
     """
 
     root = login.vmrcre_service_request(
         'projectmanagement/project/data/listchildren',
-        {'projectName': str(project_name), 'key': EDITS_KEY_PREFIX + ref + '/initial'},
+        {'projectName': str(project_name),
+         'key': EDITS_KEY_PREFIX + ref + '/' + state},
         session_hash)
     users = set()
     if root is not None:
@@ -368,6 +399,24 @@ def list_segment_users(project_name, ref, session_hash):
             if name:
                 users.add(name)
     return sorted(users)
+
+
+def list_segment_contributors(project_name, ref, session_hash):
+    """Every producer with data at this passage, across all tiers, for the
+    "who has data here" contributor strip.
+
+    Returns a list of {'producer', 'tier'} dicts, AI producers (tier='ai')
+    listed alongside the human editors.  Unlike list_segment_users (which the
+    apply flow uses and keeps to 'initial'), this enumerates every tier so the
+    UI can show, e.g., Bruce (initial) next to Gemini 3.1 Pro (ai).
+    """
+
+    contributors = []
+    for tier in CONTRIBUTOR_TIERS:
+        for producer in list_segment_users(project_name, ref, session_hash,
+                                           state=tier):
+            contributors.append({'producer': producer, 'tier': tier})
+    return contributors
 
 
 # --------------------------------------------------------------------------- #
