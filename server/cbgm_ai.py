@@ -26,11 +26,13 @@ import collections
 
 import flask
 from flask import request, current_app
+import flask_login
 import requests
 
 from ntg_common.db_tools import execute
 
 from helpers import parameters, Passage
+from login import edit_auth
 
 bp = flask.Blueprint ('cbgm_ai', __name__)
 
@@ -267,3 +269,94 @@ def local_stemma (passage_or_id):
     engine = request.args.get ('engine', 'gemini')
     resp = requests.post (AI_SERVER_URL, json = dict (unit, engine = engine), timeout = 180)
     return flask.jsonify (resp.json ())
+
+
+def _ask_model (unit, engine):
+    """POST a unit to the warm JVM co-process and return its parsed result, or a
+    ({'error'}, reachable=False) tuple if the AI server is not up."""
+    try:
+        resp = requests.post (AI_SERVER_URL, json = dict (unit, engine = engine),
+                              timeout = 180)
+    except requests.RequestException as e:
+        return { 'error': 'AI server unavailable: %s' % e }, False
+    try:
+        return resp.json (), True
+    except ValueError:
+        return { 'error': 'AI server returned non-JSON', 'raw': resp.text[:500] }, True
+
+
+def suggestion_fragment (begadr, endadr, result):
+    """Shape a JVM stemma result into a project-data fragment.
+
+    The proposed stemma is stored in the SAME shape as a human decision -- a
+    ``locstem`` of [labez, clique, source_labez, source_clique] rows (clique '1',
+    the default) -- so the review UI can diff it against the current stemma and
+    accept/override edge by edge (an accept is then an ordinary stemma-edit).
+    Alongside it rides a ``suggestions`` provenance block (model, confidence,
+    per-reading rationale, comments) that the review rail renders and that marks
+    the blob as proposed rather than committed.  See project_cbgm_ai_as_contributor.
+    """
+    stemma = result.get ('stemma') or []
+    locstem = [[e.get ('reading'), '1', e.get ('source', '?'), '1']
+               for e in stemma if e.get ('reading')]
+    rationale = { e['reading']: e.get ('rationale', '')
+                  for e in stemma if e.get ('reading') }
+    return {
+        'begadr': int (begadr), 'endadr': int (endadr),
+        'locstem': locstem, 'cliques': [], 'ms_cliques': [], 'notes': [],
+        'suggestions': {
+            'model': result.get ('model'),
+            'engine': result.get ('engine'),
+            'confidence': result.get ('confidence'),
+            'initial': result.get ('initial'),
+            'hasUndecided': result.get ('hasUndecided'),
+            'comments': result.get ('comments'),
+            'rationale': rationale,
+            'attempts': result.get ('attempts'),
+            'tokensOut': result.get ('tokensOut'),
+        },
+    }
+
+
+@bp.route ('/suggest-stemma/<passage_or_id>', methods = ['POST', 'OPTIONS'])
+def suggest_stemma (passage_or_id):
+    """Generate an AI local-stemma suggestion and STAGE it in the ai/ tier.
+
+    The [Suggest Local Stemma] write path: build the digest, ask the model, shape
+    the result into a suggestion fragment, and write it under the model's name
+    (state='ai') via cbgm_backup.put_suggestion.  It is staged, not applied -- it
+    appears beside the human editors ("who has data here") and is reviewed
+    (accept/override) in the UI.  ?engine=gemini|claude|... ?rg=<rg_id>.
+    """
+    if request.method == 'OPTIONS':
+        return flask.jsonify ({})
+    edit_auth ()
+    import cbgm_backup   # lazy: keeps a non-VMRCRE boot from needing the sync deps
+
+    engine = request.args.get ('engine', 'gemini')
+    with current_app.config.dba.engine.begin () as conn:
+        p = Passage (conn, passage_or_id)
+        rg = request.args.get ('rg')
+        unit = build_unit (conn, p.pass_id, rg_id = int (rg) if rg else None)
+        begadr, endadr = int (p.start), int (p.end)
+
+    result, reachable = _ask_model (unit, engine)
+    if not reachable or not result.get ('stemma'):
+        # AI server down, or the model failed to produce a stemma -- surface it,
+        # store nothing.
+        return flask.jsonify ({ 'stored': False, 'ref': None,
+                                'result': result }), (503 if not reachable else 200)
+
+    model = result.get ('model') or result.get ('engine') or engine
+    fragment = suggestion_fragment (begadr, endadr, result)
+
+    user = flask_login.current_user
+    project = current_app.config.get ('VMRCRE_PROJECT_NAME')
+    ref = cbgm_backup.passage_ref (begadr, endadr)
+    root = cbgm_backup.put_suggestion (project, ref, fragment, model,
+                                       getattr (user, 'api_key', None), push = 'true')
+    return flask.jsonify ({
+        'stored': root is not None,
+        'ref': ref, 'tier': 'ai', 'producer': model,
+        'result': result,
+    })
