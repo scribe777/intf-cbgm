@@ -134,6 +134,13 @@ export default {
         // accepting an edge) keeps it open so you can accept the rest.
         pass_id () { this.panel = null; this.refresh (); },
         epoch   () { this.refresh (); },
+        // Ghost the proposed edges on the stemma whenever the panel opens,
+        // switches, or closes.  local_stemma draws them (via coherence).
+        panel (p) {
+            this.$trigger ('ai_proposal', p
+                ? p.stemma.map ((e) => ({ 'reading' : e.reading, 'source' : e.source }))
+                : null);
+        },
     },
     'mounted' : function () { this.loadModels (); this.refresh (); },
     'methods' : {
@@ -269,8 +276,10 @@ $ai-soft: #8b6df0;
     margin-left: 0.75em;
     font-weight: normal;
     font-size: 0.85rem;
-    position: relative;
 }
+/* Anchor the review panel to the card (not the caption span) and float it
+   top-right, so it never covers the stemma the ghost edges are drawn on. */
+.card-local-stemma { position: relative; }
 .ai-suggest-btn {
     color: #fff;
     background: linear-gradient(180deg, #8f72f3, $ai);
@@ -298,10 +307,11 @@ $ai-soft: #8b6df0;
 .ai-panel {
     position: absolute;
     z-index: 30;
-    top: 1.9em;
-    left: 0;
-    width: 34em;
-    max-width: 92vw;
+    top: 3.2em;
+    right: 0.8em;
+    left: auto;
+    width: 26em;
+    max-width: 48%;
     background: #1f2740;
     color: #e7e9f0;
     border: 1px solid rgba(139, 109, 240, 0.4);

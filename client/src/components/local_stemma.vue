@@ -336,11 +336,62 @@ function load_passage (vm, pass_id) {
                     }
                 });
         }
+        draw_ghosts (vm);
     });
 }
 
+/**
+ * Overlay the AI's proposed edges as dashed "ghost" arrows on the current
+ * stemma (drawn source -> reading).  Re-run after every load_dot (the graph is
+ * rebuilt each reload) and whenever the proposal changes.  An edge whose source
+ * matches the current stemma renders muted (the AI concurs); one that would
+ * rewire a reading renders in the AI accent.
+ */
+function draw_ghosts (vm) {
+    const gvm = vm.get_graph_vm ();
+    if (!gvm || !gvm.$el || !gvm.graph) return;
+    const svg = select (gvm.$el);
+    svg.select ('g.ai-ghosts').remove ();
+    const edges = vm.ai_edges;
+    if (!edges || !edges.length) return;
+    const nodes = gvm.graph.nodes;
+
+    const pos_of = (labez) => {
+        let fallback = null;
+        for (const k in nodes) {
+            const a = nodes[k].attrs;
+            if (!a || !a.pos) continue;
+            if (a.labez === labez) {
+                if (a.clique === '1' || a.clique == null) return a.pos;
+                fallback = fallback || a.pos;
+            }
+        }
+        return fallback;
+    };
+    // current source per target reading, to flag agree vs. change
+    const cur = {};
+    for (const e of (gvm.graph.edges || [])) {
+        const s = nodes[e.elems[0].id], t = nodes[e.elems[1].id];
+        if (s && t && s.attrs && t.attrs) cur[t.attrs.labez] = s.attrs.labez;
+    }
+
+    const outer = svg.select ('g');   // the translated group holding the nodes
+    if (outer.empty ()) return;
+    const layer = outer.append ('g').attr ('class', 'ai-ghosts');
+
+    for (const e of edges) {
+        if (!e.reading || !e.source) continue;
+        const a = pos_of (e.source), b = pos_of (e.reading);
+        if (!a || !b || (a.x === b.x && a.y === b.y)) continue;
+        layer.append ('path')
+            .attr ('class', 'ai-ghost ' + (cur[e.reading] === e.source ? 'agrees' : 'change'))
+            .attr ('d', 'M' + a.x + ',' + a.y + ' L' + b.x + ',' + b.y);
+    }
+}
+
+
 export default {
-    'props'      : ['pass_id', 'epoch', 'global', 'var_only'],
+    'props'      : ['pass_id', 'epoch', 'global', 'var_only', 'ai_edges'],
     'components' : {
         'alert'        : alert,
         'button-group' : button_group,
@@ -364,6 +415,10 @@ export default {
         },
         epoch () {
             this.load_passage ();
+        },
+        ai_edges () {
+            // proposal changed (or cleared) — re-overlay without a full reload
+            draw_ghosts (this);
         },
         'toolbar' : {
             handler () {
@@ -426,6 +481,34 @@ div.vm-local-stemma {
     marker.link {
         visibility: hidden !important;
     }
+}
+
+/* AI-proposed "ghost" edges overlaid on the stemma (see draw_ghosts). */
+g.ai-ghosts {
+    pointer-events: none;
+
+    .ai-ghost {
+        fill: none;
+        stroke-width: 2.2;
+        stroke-linecap: round;
+        stroke-dasharray: 5 4;
+        animation: ai-ghost-march 1s linear infinite;
+
+        &.change {
+            stroke: #8b6df0;
+            filter: drop-shadow(0 0 3px rgba(139, 109, 240, 0.55));
+        }
+        &.agrees {
+            stroke: #5aa073;
+            opacity: 0.65;
+        }
+    }
+}
+@keyframes ai-ghost-march {
+    to { stroke-dashoffset: -18; }
+}
+@media (prefers-reduced-motion: reduce) {
+    g.ai-ghosts .ai-ghost { animation: none; }
 }
 
 </style>

@@ -3,6 +3,7 @@
        @epoch="on_epoch"
        @goto_attestation="on_goto_attestation"
        @coherence_in_attestations_variant_changed="on_coherence_in_attestations_variant_changed"
+       @ai_proposal="on_ai_proposal"
   >
     <div class="container bs-docs-container">
       <!-- the parent for all floating cards must be at the top of the page so
@@ -36,7 +37,7 @@
           <ai-stemma :pass_id="pass_id" :epoch="epoch" />
         </card-caption>
 
-        <localstemma :pass_id="pass_id" :epoch="epoch" />
+        <localstemma :pass_id="pass_id" :epoch="epoch" :ai_edges="aiProposal" />
       </card>
 
       <!-- Notes -->
@@ -161,6 +162,7 @@ export default {
         return {
             'pass_id' : 0,  // Number !!!
             'epoch'   : 1,  // bump this to reload components
+            'aiProposal' : null, // AI-proposed edges to ghost on the stemma
         };
     },
     /** @lends module:client/coherence */
@@ -213,6 +215,10 @@ export default {
         on_epoch () {
             this.epoch++;
             // console.log ('epoch: ' + this.epoch);
+        },
+        /** AI proposed (or cleared) a stemma — ghost its edges on the graph. */
+        on_ai_proposal (event) {
+            this.aiProposal = (event.detail && event.detail.data) || null;
         },
         /**
          * Scroll to the "Coherence in Attestations" card and load the given
