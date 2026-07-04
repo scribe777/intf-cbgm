@@ -8,6 +8,10 @@ if [ "$1" = 'app-server' ]; then
     # environment (ANTHROPIC_API_KEY, GEMINI_API_KEY, ...). Off unless enabled.
     if [ -n "$AI_LOCALSTEMMA_ENABLED" ]; then
         echo "Starting local-stemma AI server on 127.0.0.1:8078"
+        # Point crosswire.jar's ModelRegistry at the bundled model catalogue so
+        # the engines expose the real hot-editable model list (else they fall
+        # back to their in-code defaults).  Overridable from the environment.
+        export AI_MODEL_REGISTRY="${AI_MODEL_REGISTRY:-/home/ntg/ai/models.json}"
         java -cp '/home/ntg/ai/*' org.crosswire.community.ai.cbgm.LocalStemmaServer \
              --port 8078 >> /tmp/localstemma.log 2>&1 &
     fi

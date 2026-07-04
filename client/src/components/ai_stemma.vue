@@ -7,10 +7,12 @@
       <span class="ai-spark">✦</span>
       {{ busy ? 'Thinking…' : 'Suggest local stemma' }}
     </button>
-    <select v-model="engine" class="ai-engine" :disabled="busy" title="AI engine">
-      <option value="gemini">Gemini</option>
-      <option value="claude">Claude</option>
-      <option value="openai">OpenAI</option>
+    <select v-model="selected" class="ai-engine" :disabled="busy || !catalogue.length"
+            title="AI engine / model">
+      <optgroup v-for="grp in catalogue" :key="grp.engine" :label="grp.label">
+        <option v-for="m in grp.models" :key="grp.engine + '::' + m.id"
+                :value="grp.engine + '::' + m.id">{{ m.name }}</option>
+      </optgroup>
     </select>
 
     <!-- staged-suggestion hint when one already exists and none is open -->
@@ -88,7 +90,8 @@ export default {
     },
     data () {
         return {
-            'engine'       : 'gemini',
+            'catalogue'    : [],     // [{ engine, label, models:[{id,name}] }] usable here
+            'selected'     : '',     // "<engine>::<model_id>"
             'busy'         : false,
             'panel'        : null,   // the suggestion being reviewed { model, confidence, comments, stemma[] }
             'contributors' : [],     // [{ producer, tier }]
@@ -96,6 +99,8 @@ export default {
         };
     },
     'computed' : {
+        engine () { return (this.selected.split ('::')[0]) || 'gemini'; },
+        model  () { return this.selected.split ('::')[1] || ''; },
         stagedProducers () {
             return this.staged.map ((s) => s.producer);
         },
@@ -116,8 +121,24 @@ export default {
         pass_id () { this.panel = null; this.refresh (); },
         epoch   () { this.refresh (); },
     },
-    'mounted' : function () { this.refresh (); },
+    'mounted' : function () { this.loadModels (); this.refresh (); },
     'methods' : {
+        /** Fetch the engine/model catalogue (only key-configured engines) and
+         *  default the picker to the server's preferred engine. */
+        loadModels () {
+            const vm = this;
+            vm.get ('models')
+                .then ((r) => {
+                    const d = r.data.data || r.data;
+                    vm.catalogue = d.engines || [];
+                    const def = vm.catalogue.find ((e) => e.engine === d.default)
+                                || vm.catalogue[0];
+                    if (def && def.models.length) {
+                        vm.selected = def.engine + '::' + def.models[0].id;
+                    }
+                })
+                .catch (() => { vm.catalogue = []; });
+        },
         /** Load any staged AI suggestions + contributors for this passage. */
         refresh () {
             const vm = this;
@@ -140,7 +161,9 @@ export default {
             const vm = this;
             if (vm.busy) return;
             vm.busy = true;
-            vm.post ('suggest-stemma/' + vm.pass_id + '?engine=' + vm.engine)
+            const q = '?engine=' + encodeURIComponent (vm.engine)
+                    + (vm.model ? '&model=' + encodeURIComponent (vm.model) : '');
+            vm.post ('suggest-stemma/' + vm.pass_id + q)
                 .then ((r) => {
                     const d = r.data.data || r.data;
                     const res = d.result || d;

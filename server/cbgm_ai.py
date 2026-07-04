@@ -23,6 +23,8 @@ local stemma it is trying to propose.
 """
 
 import collections
+import json
+import os
 
 import flask
 from flask import request, current_app
@@ -38,6 +40,33 @@ bp = flask.Blueprint ('cbgm_ai', __name__)
 
 SCHEMA_VERSION = '1.0'
 AI_SERVER_URL  = 'http://127.0.0.1:8078/localstemma'   # the warm JVM co-process
+
+# engine name (AIEngine.getName) -> the API-key env var that enables it, and a
+# display label.  Used to offer only usable engines in the model picker.
+ENGINE_KEY_ENV = {
+    'claude':        'ANTHROPIC_API_KEY',
+    'gemini':        'GEMINI_API_KEY',
+    'openai':        'OPENAI_API_KEY',
+    'xai':           'XAI_API_KEY',
+    'perplexity':    'PERPLEXITY_API_KEY',
+    'openrouter':    'OPENROUTER_API_KEY',
+    'github-models': 'GITHUB_TOKEN',
+}
+ENGINE_LABELS = {
+    'claude': 'Claude', 'gemini': 'Gemini', 'openai': 'OpenAI', 'xai': 'xAI (Grok)',
+    'perplexity': 'Perplexity', 'openrouter': 'OpenRouter', 'github-models': 'GitHub Models',
+}
+
+
+def _model_catalogue ():
+    """The shared model catalogue (the same models.json crosswire.jar's
+    ModelRegistry reads), or {} if unavailable."""
+    path = os.environ.get ('AI_MODEL_REGISTRY', '/home/ntg/ai/models.json')
+    try:
+        with open (path) as fp:
+            return json.load (fp)
+    except (OSError, ValueError):
+        return {}
 
 
 def init_app (_app):
@@ -254,10 +283,35 @@ TOOLS = {
 #  HTTP                                                                        #
 # --------------------------------------------------------------------------- #
 
+@bp.route ('/models')
+def models ():
+    """The engine/model catalogue for the AI picker, an optgroup-shaped list
+    limited to engines that have an API key configured in this container (so the
+    picker only offers usable choices).  Reads the same models.json that
+    crosswire.jar's ModelRegistry does."""
+    catalogue = _model_catalogue ()
+    engines = []
+    for name, key in ENGINE_KEY_ENV.items ():
+        models_ = catalogue.get (name)
+        if not models_ or not os.environ.get (key):
+            continue
+        engines.append ({
+            'engine' : name,
+            'label'  : ENGINE_LABELS.get (name, name),
+            'models' : [{ 'id' : m['id'], 'name' : m.get ('name', m['id']) }
+                        for m in models_ if isinstance (m, dict) and m.get ('id')],
+        })
+    return flask.jsonify ({
+        'engines' : engines,
+        'default' : os.environ.get ('AI_DEFAULT_ENGINE', 'gemini'),
+    })
+
+
 @bp.route ('/localstemma/<passage_or_id>')
 def local_stemma (passage_or_id):
     """Build the unit for a passage and (unless ?dry_run) ask the AI server for
-    a proposed local stemma. ?engine=claude|gemini|... ?rg=<rg_id> ?dry_run=1."""
+    a proposed local stemma. ?engine=claude|gemini|... ?model=<id> ?rg=<rg_id>
+    ?dry_run=1."""
     with current_app.config.dba.engine.begin () as conn:
         p = Passage (conn, passage_or_id)
         rg = request.args.get ('rg')
@@ -266,17 +320,21 @@ def local_stemma (passage_or_id):
     if request.args.get ('dry_run'):
         return flask.jsonify (unit)
 
-    engine = request.args.get ('engine', 'gemini')
-    resp = requests.post (AI_SERVER_URL, json = dict (unit, engine = engine), timeout = 180)
-    return flask.jsonify (resp.json ())
+    result, _ = _ask_model (unit, request.args.get ('engine', 'gemini'),
+                            request.args.get ('model'))
+    return flask.jsonify (result)
 
 
-def _ask_model (unit, engine):
+def _ask_model (unit, engine, model = None):
     """POST a unit to the warm JVM co-process and return its parsed result, or a
-    ({'error'}, reachable=False) tuple if the AI server is not up."""
+    ({'error'}, reachable=False) tuple if the AI server is not up.  A non-empty
+    model overrides the engine's default; the JVM validates it against the
+    registry."""
+    payload = dict (unit, engine = engine)
+    if model:
+        payload['model'] = model
     try:
-        resp = requests.post (AI_SERVER_URL, json = dict (unit, engine = engine),
-                              timeout = 180)
+        resp = requests.post (AI_SERVER_URL, json = payload, timeout = 180)
     except requests.RequestException as e:
         return { 'error': 'AI server unavailable: %s' % e }, False
     try:
@@ -364,13 +422,14 @@ def suggest_stemma (passage_or_id):
     import cbgm_backup   # lazy: keeps a non-VMRCRE boot from needing the sync deps
 
     engine = request.args.get ('engine', 'gemini')
+    model  = request.args.get ('model')
     with current_app.config.dba.engine.begin () as conn:
         p = Passage (conn, passage_or_id)
         rg = request.args.get ('rg')
         unit = build_unit (conn, p.pass_id, rg_id = int (rg) if rg else None)
         begadr, endadr = int (p.start), int (p.end)
 
-    result, reachable = _ask_model (unit, engine)
+    result, reachable = _ask_model (unit, engine, model)
     if not reachable or not result.get ('stemma'):
         # AI server down, or the model failed to produce a stemma -- surface it,
         # store nothing.
