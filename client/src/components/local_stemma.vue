@@ -337,6 +337,7 @@ function load_passage (vm, pass_id) {
                 });
         }
         draw_ghosts (vm);
+        emit_stemma_state (vm);
     });
 }
 
@@ -381,17 +382,81 @@ function draw_ghosts (vm) {
 
     for (const e of edges) {
         if (!e.reading || !e.source) continue;
+        // Only ghost *real* suggestions — edges that differ from the current
+        // stemma.  An edge that already matches ('agrees') is not a suggestion,
+        // so a dotted line over the existing correct path is just noise.  The
+        // node pulse on hover still identifies an agreeing edge's endpoints.
+        if (cur[e.reading] === e.source) continue;
         const a = pos_of (e.source), b = pos_of (e.reading);
         if (!a || !b || (a.x === b.x && a.y === b.y)) continue;
         layer.append ('path')
-            .attr ('class', 'ai-ghost ' + (cur[e.reading] === e.source ? 'agrees' : 'change'))
+            .attr ('class', 'ai-ghost change')
+            .attr ('data-reading', e.reading)
+            .attr ('data-source', e.source)
             .attr ('d', 'M' + a.x + ',' + a.y + ' L' + b.x + ',' + b.y);
     }
+    // the graph was just rebuilt — reapply any active card-hover emphasis
+    emphasize_ghost (vm);
+}
+
+/**
+ * Emphasise the ghost edge the user is hovering in the AI suggestion panel and
+ * pulse its two nodes — the source amber, the reading green.  This mirrors the
+ * collation editor's orange-source / green-target cell pulse when hovering a
+ * regularization suggestion card.  Driven by the `ai_hover` prop.
+ */
+function emphasize_ghost (vm) {
+    const gvm = vm.get_graph_vm ();
+    if (!gvm || !gvm.$el) return;
+    const svg = select (gvm.$el);
+
+    // clear previous emphasis
+    svg.selectAll ('.ai-ghost').classed ('emph', false).classed ('dim', false);
+    svg.selectAll ('ellipse.node').classed ('ai-src-hi', false).classed ('ai-tgt-hi', false);
+
+    const h = vm.ai_hover;
+    if (!h) return;
+
+    // pulse the source (amber) and reading (green) nodes — always, so an
+    // already-correct edge (which has no ghost) is still identified on hover
+    svg.selectAll ('ellipse.node').each (function () {
+        const lz = this.getAttribute ('data-labez');
+        if (lz === h.source)  select (this).classed ('ai-src-hi', true);
+        if (lz === h.reading) select (this).classed ('ai-tgt-hi', true);
+    });
+
+    // spotlight this edge's ghost only if one is drawn (change edges only);
+    // don't dim the real suggestions when hovering an agreeing card
+    const match = svg.selectAll ('.ai-ghost').filter (function () {
+        return this.getAttribute ('data-reading') === h.reading;
+    });
+    if (!match.empty ()) {
+        svg.selectAll ('.ai-ghost').classed ('dim', true);
+        match.classed ('dim', false).classed ('emph', true).raise ();
+    }
+}
+
+/**
+ * Emit the current stemma as a { reading: sourceLabez } map so the AI
+ * suggestion panel can tell which of its proposed edges are real changes vs.
+ * already-selected paths.  Re-emitted on every (re)load, so it stays current
+ * after edits.
+ */
+function emit_stemma_state (vm) {
+    const gvm = vm.get_graph_vm ();
+    if (!gvm || !gvm.graph) return;
+    const nodes = gvm.graph.nodes;
+    const cur = {};
+    for (const e of (gvm.graph.edges || [])) {
+        const s = nodes[e.elems[0].id], t = nodes[e.elems[1].id];
+        if (s && t && s.attrs && t.attrs) cur[t.attrs.labez] = s.attrs.labez;
+    }
+    vm.$trigger ('stemma_state', cur);
 }
 
 
 export default {
-    'props'      : ['pass_id', 'epoch', 'global', 'var_only', 'ai_edges'],
+    'props'      : ['pass_id', 'epoch', 'global', 'var_only', 'ai_edges', 'ai_hover'],
     'components' : {
         'alert'        : alert,
         'button-group' : button_group,
@@ -419,6 +484,10 @@ export default {
         ai_edges () {
             // proposal changed (or cleared) — re-overlay without a full reload
             draw_ghosts (this);
+        },
+        ai_hover () {
+            // hovered card changed — re-emphasise without redrawing the ghosts
+            emphasize_ghost (this);
         },
         'toolbar' : {
             handler () {
@@ -489,9 +558,9 @@ g.ai-ghosts {
 
     .ai-ghost {
         fill: none;
-        stroke-width: 2.2;
+        stroke-width: 3.4;
         stroke-linecap: round;
-        stroke-dasharray: 5 4;
+        stroke-dasharray: 6 5;
         animation: ai-ghost-march 1s linear infinite;
 
         &.change {
@@ -502,10 +571,42 @@ g.ai-ghosts {
             stroke: #5aa073;
             opacity: 0.65;
         }
+
+        /* when a suggestion card is hovered: fade the others, spotlight this one */
+        &.dim  { opacity: 0.15; }
+        &.emph {
+            opacity: 1;
+            stroke-width: 5;
+        }
     }
 }
 @keyframes ai-ghost-march {
     to { stroke-dashoffset: -18; }
+}
+
+/* Nodes pulsed while hovering an AI suggestion card: source amber, reading
+   green — the stemma analogue of the collation editor's reg-cell pulse.  We
+   animate stroke-width + a glow filter (not just colour) so the pulse reads
+   clearly regardless of the node's labez colouring. */
+div.vm-local-stemma ellipse.node.ai-src-hi {
+    stroke: #ff6f00 !important;
+    animation: ai-node-pulse-src 1.1s ease-in-out infinite;
+}
+div.vm-local-stemma ellipse.node.ai-tgt-hi {
+    stroke: #2e7d32 !important;
+    animation: ai-node-pulse-tgt 1.1s ease-in-out infinite;
+}
+@keyframes ai-node-pulse-src {
+    0%, 100% { stroke-width: 3px; stroke-opacity: 0.85; }
+    50%      { stroke-width: 7px; stroke-opacity: 1; }
+}
+@keyframes ai-node-pulse-tgt {
+    0%, 100% { stroke-width: 3px; stroke-opacity: 0.85; }
+    50%      { stroke-width: 7px; stroke-opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    div.vm-local-stemma ellipse.node.ai-src-hi,
+    div.vm-local-stemma ellipse.node.ai-tgt-hi { animation: none; }
 }
 @media (prefers-reduced-motion: reduce) {
     g.ai-ghosts .ai-ghost { animation: none; }

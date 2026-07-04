@@ -40,21 +40,54 @@
 
       <p v-if="panel.comments" class="ai-comments">{{ panel.comments }}</p>
 
-      <div class="ai-edges">
-        <div v-for="e in panel.stemma" :key="e.reading" class="ai-edge">
-          <span class="ai-move">
-            <b>{{ e.reading }}</b>
-            <span class="ai-arrow">←</span>
-            <b>{{ e.source }}</b>
-          </span>
-          <span class="ai-rationale">{{ e.rationale }}</span>
-          <button type="button" class="btn btn-sm ai-accept"
-                  :disabled="e.source === '*' || busy"
-                  :title="e.source === '*' ? 'initial-text edge — set via the editor' : 'Apply ' + e.reading + ' ← ' + e.source"
-                  @click="accept (e)">
-            {{ e._done ? '✓ applied' : 'Accept' }}
-          </button>
+      <!-- how many are real changes vs. paths already selected, + a toggle to
+           reveal the agreeing ones (for their rationale) -->
+      <div v-if="panel.stemma.length" class="ai-sub">
+        <span class="ai-sub-count">
+          {{ changeEdges.length }} change<span v-if="changeEdges.length !== 1">s</span>
+          <span v-if="agreeEdges.length" class="ai-sub-agree">
+            · {{ agreeEdges.length }} already set</span>
+        </span>
+        <span class="ai-spring"></span>
+        <button v-if="agreeEdges.length" type="button" class="ai-toggle"
+                @click="showAll = !showAll">
+          {{ showAll ? 'changes only' : 'show all' }}
+        </button>
+      </div>
+
+      <div v-if="visibleEdges.length" class="ai-cards">
+        <div v-for="e in visibleEdges" :key="e.reading" class="ai-card"
+             :class="{ 'ai-card-init' : e.source === '*', 'ai-card-done' : e._done,
+                       'ai-card-agrees' : agrees (e) }"
+             @mouseenter="hover (e)" @mouseleave="hover (null)">
+          <div class="ai-card-head">
+            <span class="ai-tok ai-tok-reading">{{ e.reading }}</span>
+            <span class="ai-tok-arrow">←</span>
+            <span class="ai-tok ai-tok-source">{{ e.source }}</span>
+            <span v-if="agrees (e)" class="ai-card-badge ai-badge-set">✓ set</span>
+            <span v-else-if="e.source === '*'" class="ai-card-badge">initial</span>
+          </div>
+          <p v-if="e.rationale" class="ai-card-reason">{{ e.rationale }}</p>
+          <div class="ai-card-actions">
+            <button type="button" class="ai-card-accept"
+                    :disabled="e.source === '*' || busy || e._done || agrees (e)"
+                    :title="e.source === '*' ? 'initial-text edge — set via the editor' : 'Apply ' + e.reading + ' ← ' + e.source"
+                    @click="accept (e)">
+              {{ e._done ? '✓ applied' : (agrees (e) ? '✓ already set' : 'Accept') }}
+            </button>
+            <button type="button" class="ai-card-dismiss"
+                    :disabled="busy" title="Dismiss this suggestion"
+                    @click="dismiss (e)">
+              Dismiss
+            </button>
+          </div>
         </div>
+      </div>
+
+      <div v-else-if="panel.stemma.length" class="ai-empty">
+        The AI agrees with your stemma — nothing to change.
+        <button v-if="agreeEdges.length" type="button" class="ai-toggle"
+                @click="showAll = true">see its reasoning</button>
       </div>
 
       <div v-if="contributors.length" class="ai-contrib">
@@ -87,8 +120,10 @@ import alert from 'widgets/alert.vue';
 export default {
     'components' : { alert },
     'props' : {
-        'pass_id' : { 'type' : [Number, String], 'required' : true },
-        'epoch'   : { 'type' : Number, 'default' : 0 },
+        'pass_id'      : { 'type' : [Number, String], 'required' : true },
+        'epoch'        : { 'type' : Number, 'default' : 0 },
+        // current stemma { reading: sourceLabez }, from local_stemma via coherence
+        'stemma_state' : { 'type' : Object, 'default' : null },
     },
     data () {
         return {
@@ -98,6 +133,7 @@ export default {
             'panel'        : null,   // the suggestion being reviewed { model, confidence, comments, stemma[] }
             'contributors' : [],     // [{ producer, tier }]
             'staged'       : [],     // ai-tier fragments already stored here
+            'showAll'      : false,  // reveal edges the AI proposes that are already set
         };
     },
     'computed' : {
@@ -105,6 +141,19 @@ export default {
         model  () { return this.selected.split ('::')[1] || ''; },
         stagedProducers () {
             return this.staged.map ((s) => s.producer);
+        },
+        /** Proposed edges that differ from the current stemma (real changes). */
+        changeEdges () {
+            return (this.panel ? this.panel.stemma : []).filter ((e) => !this.agrees (e));
+        },
+        /** Proposed edges that already match the current stemma. */
+        agreeEdges () {
+            return (this.panel ? this.panel.stemma : []).filter ((e) => this.agrees (e));
+        },
+        /** Cards to render: changes only by default, everything under "show all". */
+        visibleEdges () {
+            if (!this.panel) return [];
+            return this.showAll ? this.panel.stemma : this.changeEdges;
         },
         confPct () {
             const c = this.panel && this.panel.confidence;
@@ -132,11 +181,12 @@ export default {
     'watch' : {
         // A new passage closes the open panel; an epoch bump (e.g. after
         // accepting an edge) keeps it open so you can accept the rest.
-        pass_id () { this.panel = null; this.refresh (); },
+        pass_id () { this.panel = null; this.showAll = false; this.refresh (); },
         epoch   () { this.refresh (); },
         // Ghost the proposed edges on the stemma whenever the panel opens,
         // switches, or closes.  local_stemma draws them (via coherence).
         panel (p) {
+            if (p) this.showAll = false;   // a fresh suggestion starts changes-only
             this.$trigger ('ai_proposal', p
                 ? p.stemma.map ((e) => ({ 'reading' : e.reading, 'source' : e.source }))
                 : null);
@@ -214,6 +264,31 @@ export default {
                     vm.$refs.alert.show (msg, 'error');
                 })
                 .finally (() => { vm.busy = false; });
+        },
+        /** Does this proposed edge already match the current stemma? (i.e. the
+         *  reading's source is already what the AI proposes — nothing to do). */
+        agrees (e) {
+            const st = this.stemma_state;
+            return !!(st && Object.prototype.hasOwnProperty.call (st, e.reading)
+                      && st[e.reading] === e.source);
+        },
+        /** Card hover -> tell the stemma to emphasise this ghost edge and pulse
+         *  its source (amber) + reading (green) nodes — the analogue of the
+         *  collation editor's orange/green cell highlight on suggestion hover. */
+        hover (e) {
+            this.$trigger ('ai_hover', e
+                ? { 'reading' : e.reading, 'source' : e.source }
+                : null);
+        },
+        /** Drop one suggestion from the panel (local only; nothing persisted).
+         *  Re-ghosts the remaining edges so the overlay stays in sync. */
+        dismiss (e) {
+            const vm = this;
+            if (!vm.panel) return;
+            vm.panel.stemma = vm.panel.stemma.filter ((x) => x !== e);
+            vm.$trigger ('ai_hover', null);
+            vm.$trigger ('ai_proposal', vm.panel.stemma.map (
+                (x) => ({ 'reading' : x.reading, 'source' : x.source })));
         },
         /** Accept one edge: set reading <- source via an ordinary stemma-edit. */
         accept (e) {
@@ -348,22 +423,86 @@ $ai-soft: #8b6df0;
     border-left: 2px solid rgba(139, 109, 240, 0.5);
     padding-left: 0.6em;
 }
-.ai-edges { display: flex; flex-direction: column; gap: 0.3em; }
-.ai-edge {
-    display: flex; align-items: center; gap: 0.7em;
-    padding: 0.35em 0.4em; border-radius: 0.35em;
-    background: rgba(255, 255, 255, 0.02);
+/* Suggestion cards — modelled on the collation editor's Regularization
+   Suggestions cards (reg-card): a hover-lift card with coloured source/target
+   tokens, a reason line, and an Accept/Dismiss pair.  Hovering a card also
+   emphasises its ghost edge and pulses its nodes on the stemma (see hover()). */
+.ai-cards { display: flex; flex-direction: column; gap: 0.5em; margin-top: 0.2em; }
+.ai-card {
+    padding: 0.55em 0.6em;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
-.ai-move { font-family: monospace; font-size: 0.9rem; flex: 0 0 auto; min-width: 4.5em; }
-.ai-move b { color: #f2f1fb; }
-.ai-arrow { color: $ai-soft; padding: 0 0.25em; }
-.ai-rationale { flex: 1; font-size: 0.78rem; color: #a9b0c0; line-height: 1.35; }
-.ai-accept {
-    flex: 0 0 auto; color: #fff;
-    background: linear-gradient(180deg, #8f72f3, $ai);
-    border: 1px solid rgba(118, 87, 230, 0.5); padding: 0.05em 0.55em;
-    &:hover { filter: brightness(1.1); color: #fff; }
-    &:disabled { opacity: 0.45; }
+.ai-card:hover {
+    border-color: rgba(139, 109, 240, 0.7);
+    box-shadow: 0 2px 12px -3px rgba(139, 109, 240, 0.55);
+    background: rgba(139, 109, 240, 0.08);
+}
+.ai-card-done { opacity: 0.55; }
+.ai-card-init { opacity: 0.8; }
+.ai-card-head {
+    display: flex; align-items: center; gap: 0.4em; flex-wrap: wrap;
+    margin-bottom: 0.35em;
+}
+.ai-tok {
+    font-family: monospace; font-weight: bold; font-size: 0.95rem;
+    padding: 0.05em 0.4em; border-radius: 0.25em;
+}
+.ai-tok-reading { background: rgba(90, 160, 115, 0.24); color: #cde7d6; }
+.ai-tok-source  { background: rgba(230, 170, 70, 0.20);  color: #f2d9a8; }
+.ai-tok-arrow   { color: $ai-soft; padding: 0 0.15em; }
+.ai-card-badge {
+    margin-left: auto; font-size: 0.62rem; text-transform: uppercase;
+    letter-spacing: 0.05em; padding: 0.1em 0.4em; border-radius: 0.25em;
+    background: rgba(139, 109, 240, 0.15); color: $ai-soft;
+}
+.ai-card-reason {
+    margin: 0 0 0.45em; font-size: 0.78rem; color: #a9b0c0; line-height: 1.4;
+}
+/* changes-vs-already-set summary + the show-all toggle */
+.ai-sub {
+    display: flex; align-items: center; gap: 0.5em;
+    margin: 0.55em 0 0.15em; font-size: 0.72rem; color: #8b93a7;
+}
+.ai-sub-agree { color: #7fae8c; }
+.ai-toggle {
+    background: none; border: 1px solid rgba(139, 109, 240, 0.5);
+    color: $ai-soft; border-radius: 1em; padding: 0.05em 0.65em;
+    font-size: 0.7rem; cursor: pointer;
+    &:hover { background: rgba(139, 109, 240, 0.12); }
+}
+.ai-empty {
+    font-size: 0.82rem; color: #a9b0c0; line-height: 1.45;
+    padding: 0.5em 0.2em 0.2em;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 0.5em;
+}
+
+/* an already-selected path shown under "show all": muted, source token neutral */
+.ai-card-agrees {
+    opacity: 0.72;
+    .ai-tok-source { background: rgba(255, 255, 255, 0.06); color: #aeb4c4; }
+}
+.ai-badge-set { background: rgba(127, 174, 140, 0.18); color: #9fd0ab; }
+
+.ai-card-actions { display: flex; gap: 0.4em; }
+.ai-card-accept {
+    flex: 1; padding: 0.2em; font-size: 0.8rem; font-weight: bold;
+    color: #cde7d6; background: rgba(90, 160, 115, 0.18);
+    border: 1px solid rgba(90, 160, 115, 0.6); border-radius: 0.25em;
+    cursor: pointer;
+    &:hover { background: rgba(90, 160, 115, 0.3); }
+    &:disabled { opacity: 0.45; cursor: default; }
+}
+.ai-card-dismiss {
+    flex: 1; padding: 0.2em; font-size: 0.8rem;
+    color: #9098ab; background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 0.25em;
+    cursor: pointer;
+    &:hover { background: rgba(255, 255, 255, 0.08); color: #c9cede; }
+    &:disabled { opacity: 0.45; cursor: default; }
 }
 
 .ai-contrib {

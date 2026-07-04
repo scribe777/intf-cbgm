@@ -4,6 +4,8 @@
        @goto_attestation="on_goto_attestation"
        @coherence_in_attestations_variant_changed="on_coherence_in_attestations_variant_changed"
        @ai_proposal="on_ai_proposal"
+       @ai_hover="on_ai_hover"
+       @stemma_state="on_stemma_state"
   >
     <div class="container bs-docs-container">
       <!-- the parent for all floating cards must be at the top of the page so
@@ -34,10 +36,11 @@
         <card-caption>
           Local Stemma
           <editor-decisions :pass_id="pass_id" :epoch="epoch" />
-          <ai-stemma :pass_id="pass_id" :epoch="epoch" />
+          <ai-stemma :pass_id="pass_id" :epoch="epoch" :stemma_state="stemmaState" />
         </card-caption>
 
-        <localstemma :pass_id="pass_id" :epoch="epoch" :ai_edges="aiProposal" />
+        <localstemma :pass_id="pass_id" :epoch="epoch" :ai_edges="aiProposal"
+                     :ai_hover="aiHover" />
       </card>
 
       <!-- Notes -->
@@ -163,6 +166,8 @@ export default {
             'pass_id' : 0,  // Number !!!
             'epoch'   : 1,  // bump this to reload components
             'aiProposal' : null, // AI-proposed edges to ghost on the stemma
+            'aiHover'    : null, // which proposed edge the user is hovering
+            'stemmaState': null, // current { reading: sourceLabez } of the stemma
         };
     },
     /** @lends module:client/coherence */
@@ -219,6 +224,15 @@ export default {
         /** AI proposed (or cleared) a stemma — ghost its edges on the graph. */
         on_ai_proposal (event) {
             this.aiProposal = (event.detail && event.detail.data) || null;
+        },
+        /** User hovered (or left) a suggestion card — emphasise that ghost edge. */
+        on_ai_hover (event) {
+            this.aiHover = (event.detail && event.detail.data) || null;
+        },
+        /** The stemma (re)loaded — remember its current edges so the AI panel
+         *  can distinguish real change-suggestions from already-selected paths. */
+        on_stemma_state (event) {
+            this.stemmaState = (event.detail && event.detail.data) || null;
         },
         /**
          * Scroll to the "Coherence in Attestations" card and load the given
