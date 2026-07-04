@@ -157,7 +157,12 @@ class Word ():
             if m.group (1):
                 bk = m.group (1).lower ()
                 for b in tools.BOOKS:
-                    if b[1].lower () == bk or b[2].lower () == bk:
+                    # Accept the display siglum ('J'), the full name ('John'),
+                    # or the canonical OSIS code ('John' / 'Rev') -- fresh NT
+                    # imports store the OSIS token in books.siglum, so the
+                    # navigator must resolve it too.
+                    if (b[1].lower () == bk or b[2].lower () == bk
+                            or tools.get_osis_by_id (b[0]).lower () == bk):
                         self.book = b[0]
                         break
             self.chapter = int (m.group (2) or '0')
@@ -166,15 +171,18 @@ class Word ():
         return self
 
 
-    def format (self, start = None):
-        # Format a word to the format: "Acts 1:2/3-4"
+    def format (self, start = None, osis = False):
+        # Format a word to the format: "Acts 1:2/3-4".  osis=True uses the
+        # canonical OSIS book code ('John', 'Rev') instead of the display siglum
+        # ('J', 'Ap') -- used to build the OSIS-canonical project-data store key
+        # (see cbgm_backup.passage_ref), keeping display and storage decoupled.
+        book = (tools.get_osis_by_id (self.book) if osis
+                else tools.get_book_by_id (self.book)[1])
         if start is None:
-            return "%s %d:%d/%d" % (
-                tools.get_book_by_id (self.book)[1], self.chapter, self.verse, self.word)
+            return "%s %d:%d/%d" % (book, self.chapter, self.verse, self.word)
 
         if start.book != self.book:
-            return " - %s %d:%d/%d" % (
-                tools.get_book_by_id (self.book)[1], self.chapter, self.verse, self.word)
+            return " - %s %d:%d/%d" % (book, self.chapter, self.verse, self.word)
         if start.chapter != self.chapter:
             return " - %d:%d/%d" % (self.chapter, self.verse, self.word)
         if start.verse != self.verse:
@@ -213,13 +221,14 @@ class Passage ():
 
 
     @staticmethod
-    def static_to_hr (start, end):
-        # return passage in human-readable format
+    def static_to_hr (start, end, osis = False):
+        # return passage in human-readable format; osis=True emits the canonical
+        # OSIS book code (for storage keys) rather than the display siglum.
         s = Word (start)
         if start == end:
-            return s.format ()
+            return s.format (osis = osis)
         e = Word (end)
-        return s.format () + e.format (s)
+        return s.format (osis = osis) + e.format (s, osis = osis)
 
 
     def to_hr (self):

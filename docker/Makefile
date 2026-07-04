@@ -10,6 +10,10 @@ ifeq ($(shell [ "$(NODE_MAJOR)" -ge 17 ] 2>/dev/null && echo 1),1)
 export NODE_OPTIONS := $(NODE_OPTIONS) --openssl-legacy-provider
 endif
 
+# The CBGM local-stemma AI service (a small JVM co-process). Its source lives in
+# the vmrcre repo; `make dist` there produces the jars + prompt + schema.
+CBGM_AI_DIR ?= ../../vmrcre/contrib/ai/cbgm-ai
+
 # Assemble the app build context: (re)build the Vue.js client and copy the
 # source trees into this directory (= the Docker build context).
 # Works with node v14.15.0 / npm v6.14.8 and with modern node (>=17; see above).
@@ -18,7 +22,7 @@ app-context: Makefile
 	cd ../client && npm install
 	cd ../client && $(MAKE)
 	# copy all source folders into this folder so the Dockerfile can COPY them
-	rm -rf client scripts server ntg_common
+	rm -rf client scripts server ntg_common ai
 	mkdir client scripts
 	cp -a ../server ../ntg_common .
 	cp -a ../client/build/* ./client
@@ -26,6 +30,10 @@ app-context: Makefile
 	# the app imports ntvmrimport (NTVMR -> CBGM apparatus import driver),
 	# which lives in scripts/python, not scripts/cceh
 	cp -a ../scripts/python/ntvmrimport.py ./scripts
+	# stage the local-stemma AI service (jars + prompt + schema) as ai/. The
+	# JVM only runs at container start when AI_LOCALSTEMMA_ENABLED is set.
+	$(MAKE) -C $(CBGM_AI_DIR) dist
+	cp -a $(CBGM_AI_DIR)/dist ./ai
 
 build: app-context
 	# single-arch local dev images (intf/*)

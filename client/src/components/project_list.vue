@@ -443,6 +443,11 @@ export default {
               }
               return;
             }
+            // A dump load against a not-yet-imported project mints a fresh local
+            // id server-side; adopt it so polling/Open target it (on a reload it
+            // just equals the current id).
+            if (d.pid != null) p.project_id = String(d.pid);
+            if (d.status) vm.$set(p, "import", d.status);
             vm.ensure_polling();
           })
           .catch(function(err) {
@@ -616,7 +621,20 @@ export default {
           ),
           data
         )
-        .then(function() {
+        .then(function(r) {
+          const d = (r.data && r.data.data) || r.data || {};
+          if (d.started === false) {
+            vm.$set(p, "import", {
+              state: "error",
+              message: d.error || "could not start CBGM"
+            });
+            return;
+          }
+          // The server mints a LOCAL id for a fresh import (distinct from the
+          // remote projectID, so backends can't collide).  Adopt it so
+          // import_status polling and, later, Open target the right project.
+          if (d.pid != null) p.project_id = String(d.pid);
+          if (d.status) vm.$set(p, "import", d.status);
           vm.ensure_polling();
         })
         .catch(function(e) {

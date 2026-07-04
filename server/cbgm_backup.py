@@ -55,31 +55,33 @@ def verse_base(begadr):
 
 
 def verse_ref(begadr):
-    """OSIS-ish verse reference for an address, e.g. 'Mt.1.5' (display only).
+    """OSIS verse reference for an address, e.g. 'Matt.1.5'.
 
+    Uses the canonical OSIS book code (get_osis_by_id), matching the VMRCRE and
+    the passage_ref storage keys -- not the terse display siglum ('Mt').
     Address layout: bk_id (tbbb) * 10^9 + chapter * 10^6 + verse * 10^3 + word.
     """
     base = verse_base(begadr)
     book = base // 1000000000
     chapter = (base // 1000000) % 1000
     verse = (base // 1000) % 1000
-    b = tools.get_book_by_id(book)
-    name = b[1] if b else ('Bk%d' % book)
-    return '%s.%d.%d' % (name, chapter, verse)
+    return '%s.%d.%d' % (tools.get_osis_by_id(book), chapter, verse)
 
 
 def passage_ref(begadr, endadr):
     """Canonical, path-safe passage reference used as the storage key.
 
     The clearly-defined passage identity (NOT a changeable surrogate like
-    pass_id): e.g. 'John.1.5.2-4' or 'John.2.7.24-8.2'.  Derived from the
-    tool's own human-readable form (``Passage.static_to_hr`` -> 'John 1:5/2-4')
-    with ':' '/' and spaces turned into '.' so it is a single key path segment.
-    Stable across an apparatus *re-import* (addresses are recomputed from the
-    same references); pass_id is not, which is why we never key on it.
+    pass_id): e.g. 'John.1.5.2-4' or 'John.2.7.24-8.2'.  Derived from the tool's
+    human-readable form built with the canonical OSIS book code
+    (``Passage.static_to_hr(osis=True)`` -> 'John 1:5/2-4') -- NOT the display
+    siglum ('J'), so the key matches the VMRCRE's OSIS refs -- with ':' '/' and
+    spaces turned into '.' so it is a single key path segment.  Stable across an
+    apparatus *re-import* (addresses are recomputed from the same references);
+    pass_id is not, which is why we never key on it.
     """
 
-    hr = Passage.static_to_hr(int(begadr), int(endadr))
+    hr = Passage.static_to_hr(int(begadr), int(endadr), osis=True)
     return (hr.replace(' - ', '-').replace(':', '.')
               .replace('/', '.').replace(' ', '.'))
 
@@ -250,8 +252,20 @@ def list_pending(conn, user_name):
 # NTVMR project/data store (user-scoped, per segment)
 # --------------------------------------------------------------------------- #
 
-def _project_id():
-    return current_app.config.get('VMRCRE_PROJECT_ID')
+# The datastore is a git repo keyed by project NAME (projects/<Name>/...), so
+# sync addresses the project by name -- self-describing to anyone who clones it,
+# and free of the per-connection projectID collisions. The numeric id is not
+# stored or used. _project_local_id() is only a LOCAL handle (status/db/mount).
+def _project_name():
+    return current_app.config.get('VMRCRE_PROJECT_NAME')
+
+def _project_local_id():
+    # The locally-minted surrogate id (status/db/mount handle only).  Falls back
+    # to the legacy VMRCRE_PROJECT_ID key for confs written before the id was
+    # renamed to CBGM_LOCAL_ID (which then held the remote pid, but those old
+    # confs are self-consistent -- db/mount/id all derived from the same value).
+    cfg = current_app.config
+    return cfg.get('CBGM_LOCAL_ID') or cfg.get('VMRCRE_PROJECT_ID')
 
 
 def user_can_save(session_hash):
@@ -277,7 +291,7 @@ def user_can_save(session_hash):
     return role in login.imported_roles(current_app.config)
 
 
-def put_segment(project_id, ref, fragment, user_name, session_hash, push='false'):
+def put_segment(project_name, ref, fragment, user_name, session_hash, push='false'):
     """Write a segment fragment to the NTVMR under its passage reference.
 
     Returns the response root, or None on failure (offline / NTVMR
@@ -288,18 +302,18 @@ def put_segment(project_id, ref, fragment, user_name, session_hash, push='false'
 
     return login.vmrcre_service_request(
         'projectmanagement/project/data/put',
-        {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + ref,
+        {'projectName': str(project_name), 'key': EDITS_KEY_PREFIX + ref,
          'subKey': EDITS_SUBKEY, 'userName': user_name,
          'data': json.dumps(fragment), 'push': push},
         session_hash)
 
 
-def get_segment(project_id, ref, user_name, session_hash):
+def get_segment(project_name, ref, user_name, session_hash):
     """Return a fragment dict for (passage ref, user), or None."""
 
     root = login.vmrcre_service_request(
         'projectmanagement/project/data/get',
-        {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + ref,
+        {'projectName': str(project_name), 'key': EDITS_KEY_PREFIX + ref,
          'subKey': EDITS_SUBKEY, 'userName': user_name},
         session_hash)
     if root is None:
@@ -317,7 +331,7 @@ def get_segment(project_id, ref, user_name, session_hash):
     return None
 
 
-def list_all_refs(project_id, session_hash):
+def list_all_refs(project_name, session_hash):
     """All passage refs that have any saved decisions (children of cbgm/edits).
 
     Returned opaque -- the begadr/endadr needed to apply live inside each
@@ -326,7 +340,7 @@ def list_all_refs(project_id, session_hash):
 
     root = login.vmrcre_service_request(
         'projectmanagement/project/data/listchildren',
-        {'projectID': str(project_id), 'key': 'cbgm/edits'}, session_hash)
+        {'projectName': str(project_name), 'key': 'cbgm/edits'}, session_hash)
     refs = []
     if root is not None:
         for el in root.getElementsByTagName('projectData'):
@@ -336,7 +350,7 @@ def list_all_refs(project_id, session_hash):
     return refs
 
 
-def list_segment_users(project_id, ref, session_hash):
+def list_segment_users(project_name, ref, session_hash):
     """Usernames that have decisions stored at this passage.
 
     User-scoped data lives at cbgm/edits/<ref>/initial/<user>/data.txt, so the
@@ -345,7 +359,7 @@ def list_segment_users(project_id, ref, session_hash):
 
     root = login.vmrcre_service_request(
         'projectmanagement/project/data/listchildren',
-        {'projectID': str(project_id), 'key': EDITS_KEY_PREFIX + ref + '/initial'},
+        {'projectName': str(project_name), 'key': EDITS_KEY_PREFIX + ref + '/initial'},
         session_hash)
     users = set()
     if root is not None:
@@ -360,7 +374,7 @@ def list_segment_users(project_id, ref, session_hash):
 # Outbox flush (push pending segments when connectivity + permission allow)
 # --------------------------------------------------------------------------- #
 
-def flush_pending(app, project_id, user_name, session_hash, push='true'):
+def flush_pending(app, project_name, user_name, session_hash, push='true'):
     """Try to push all of the user's pending segments to the NTVMR.
 
     Pending work is *retained* on failure: without the save role it is kept and
@@ -368,7 +382,7 @@ def flush_pending(app, project_id, user_name, session_hash, push='true'):
     unreachable it is kept and retried later.  Returns (pushed, remaining).
     """
 
-    if not (project_id and user_name and session_hash):
+    if not (project_name and user_name and session_hash):
         return (0, 0)
     with app.app_context():
         can = user_can_save(session_hash)
@@ -389,7 +403,7 @@ def flush_pending(app, project_id, user_name, session_hash, push='true'):
                     clear_pending(conn, p['begadr'], p['endadr'], user_name)
                     continue               # passage no longer in this apparatus
                 ref = passage_ref(p['begadr'], p['endadr'])
-                ok = put_segment(project_id, ref, frag,
+                ok = put_segment(project_name, ref, frag,
                                  user_name, session_hash, push=push)
                 if ok is not None:
                     clear_pending(conn, p['begadr'], p['endadr'], user_name)
@@ -402,10 +416,10 @@ def flush_pending(app, project_id, user_name, session_hash, push='true'):
             conn.close()
 
 
-def on_edit(app, project_id, begadr, endadr, user_name, session_hash, delay=8):
+def on_edit(app, project_name, begadr, endadr, user_name, session_hash, delay=8):
     """Called when a segment is edited: mark it dirty now, debounce a flush."""
 
-    if not (project_id and user_name and session_hash and begadr):
+    if not (project_name and user_name and session_hash and begadr):
         return
     try:
         conn = app.config.dba.engine.raw_connection()
@@ -416,11 +430,11 @@ def on_edit(app, project_id, begadr, endadr, user_name, session_hash, delay=8):
     except Exception:  # pylint: disable=broad-except
         log.exception('failed to mark segment %s-%s pending', begadr, endadr)
 
-    key = (str(project_id), int(begadr), int(endadr), user_name)
+    key = (str(project_name), int(begadr), int(endadr), user_name)
 
     def run():
         try:
-            flush_pending(app, project_id, user_name, session_hash)
+            flush_pending(app, project_name, user_name, session_hash)
         except Exception:  # pylint: disable=broad-except
             log.exception('flush after edit failed for %s-%s', begadr, endadr)
 
@@ -467,7 +481,7 @@ def editorial_users_by_passage(pass_id):
                                    'mine': False, 'dirty': dirty})
     begadr, endadr = seg
     ref = passage_ref(begadr, endadr)
-    users = list_segment_users(_project_id(), ref, sh)
+    users = list_segment_users(_project_name(), ref, sh)
     return make_json_response({'pass_id': pass_id, 'verse': verse_ref(begadr),
                                'ref': ref, 'dirty': dirty,
                                'users': users, 'me': me, 'mine': me in users})
@@ -498,11 +512,11 @@ def editorial_autoload(pass_id):
         if me and is_pending(conn, begadr, endadr, me):
             # I have unsynced local edits here -- don't overwrite them.
             return make_json_response({'loaded': False, 'dirty': True, 'ref': ref})
-        users = list_segment_users(_project_id(), ref, sh)
+        users = list_segment_users(_project_name(), ref, sh)
         who = me if me in users else (users[0] if users else None)
         if not who:
             return make_json_response({'loaded': False, 'ref': ref})
-        frag = get_segment(_project_id(), ref, who, sh)
+        frag = get_segment(_project_name(), ref, who, sh)
         if frag is None:
             return make_json_response({'loaded': False, 'ref': ref})
         apply_segment(conn, frag, getattr(flask_login.current_user, 'id', 0))
@@ -534,9 +548,9 @@ def editorial_load(pass_id):
         ref = passage_ref(begadr, endadr)
         who = request.values.get('userName')
         if not who:
-            users = list_segment_users(_project_id(), ref, sh)
+            users = list_segment_users(_project_name(), ref, sh)
             who = me if me in users else (users[0] if users else me)
-        frag = get_segment(_project_id(), ref, who, sh) if who else None
+        frag = get_segment(_project_name(), ref, who, sh) if who else None
         if frag is None:
             return make_json_response({'loaded': False, 'user': who, 'ref': ref})
         apply_segment(conn, frag, getattr(flask_login.current_user, 'id', 0))
@@ -572,7 +586,7 @@ def editorial_save(pass_id):
                  'reason': 'no Project CBGM Editor role; queued to sync later',
                  'ref': ref})
         frag = export_segment(conn, begadr, endadr)
-        ok = put_segment(_project_id(), ref, frag, me, sh, push='true') \
+        ok = put_segment(_project_name(), ref, frag, me, sh, push='true') \
             if frag is not None else None
         if ok is None:
             return make_json_response(
@@ -631,7 +645,7 @@ def editorial_sync():
         return make_json_response({'synced': False, 'reason': 'local-only'})
     me = _current_user_name()
     sh = getattr(flask_login.current_user, 'api_key', None)
-    pid = _project_id()
+    pid = _project_name()
     if not (me and sh and pid):
         return make_json_response({'synced': False, 'reason': 'not logged in'})
     pushed, remaining = flush_pending(current_app._get_current_object(), pid, me, sh)
@@ -640,37 +654,41 @@ def editorial_sync():
                                'can_save': user_can_save(sh)})
 
 
-def _refresh_all_worker(app, project_id, user_name, session_hash, user_id):
-    """Apply every saved segment's decisions into the DB (whole-project analysis)."""
+def _refresh_all_worker(app, project_name, local_id, user_name, session_hash, user_id):
+    """Apply every saved segment's decisions into the DB (whole-project analysis).
+
+    Sync reads by project NAME (the datastore's git key); progress is reported
+    under the LOCAL id, which is what the client polls status by.
+    """
 
     import cbgm_import  # share its status dict so import_status.json shows progress
     with app.app_context():
         try:
-            refs = list_all_refs(project_id, session_hash)
+            refs = list_all_refs(project_name, session_hash)
             total = len(refs)
-            cbgm_import._set(project_id, state='refreshing', done=0, total=total,
+            cbgm_import._set(local_id, state='refreshing', done=0, total=total,
                              message='loading decisions')
             conn = app.config.dba.engine.raw_connection()
             try:
                 for i, ref in enumerate(refs, 1):
-                    users = list_segment_users(project_id, ref, session_hash)
+                    users = list_segment_users(project_name, ref, session_hash)
                     who = (user_name if user_name in users
                            else (users[0] if users else None))
-                    frag = (get_segment(project_id, ref, who, session_hash)
+                    frag = (get_segment(project_name, ref, who, session_hash)
                             if who else None)
                     if frag:
                         apply_segment(conn, frag, user_id)
-                    cbgm_import._set(project_id, state='refreshing', done=i,
+                    cbgm_import._set(local_id, state='refreshing', done=i,
                                      total=total, message=ref)
             finally:
                 conn.close()
-            cbgm_import._set(project_id, state='done', done=total, total=total,
+            cbgm_import._set(local_id, state='done', done=total, total=total,
                              message='decisions loaded')
             log.info('Refreshed %d segments of decisions for project %s (%s)',
-                     total, project_id, user_name)
+                     total, project_name, user_name)
         except Exception as e:  # pylint: disable=broad-except
-            log.exception('refresh-all failed for project %s', project_id)
-            cbgm_import._set(project_id, state='error', message=str(e))
+            log.exception('refresh-all failed for project %s', project_name)
+            cbgm_import._set(local_id, state='error', message=str(e))
 
 
 @bp.route('/editorial/refresh_all.json', methods=['POST', 'OPTIONS'])
@@ -683,12 +701,13 @@ def editorial_refresh_all():
     me = _current_user_name()
     sh = getattr(flask_login.current_user, 'api_key', None)
     uid = getattr(flask_login.current_user, 'id', 0)
-    pid = _project_id()
-    if not (me and sh and pid):
+    name = _project_name()
+    local_id = _project_local_id()
+    if not (me and sh and name):
         return make_json_response({'started': False, 'reason': 'not logged in'})
     t = threading.Thread(
         target=_refresh_all_worker,
-        args=(current_app._get_current_object(), pid, me, sh, uid),
+        args=(current_app._get_current_object(), name, local_id, me, sh, uid),
         daemon=True)
     t.start()
     return make_json_response({'started': True})

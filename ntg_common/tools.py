@@ -179,6 +179,35 @@ def get_book_by_id (id_):
     return None
 
 
+# Canonical OSIS book code by tbbb bk_id.  This -- NOT the display siglum
+# (BOOKS[..][1]) -- is the cross-tool book token: it matches the VMRCRE
+# apparatus' indexContent and the project-data store keys, so CBGM editorial
+# decisions sync to the same ref the rest of the platform uses.  For the NT the
+# display siglum is the terse INTF/Nestle form ('J', 'Ap', 'R') which differs
+# from OSIS; for OT/LXX books the OSIS id already equals the siglum, so only the
+# 27 NT books are mapped here.  Verified against the live VMRCRE v11n
+# (KJV NT osisIDs and LXXNU OT osisIDs).
+_NT_OSIS = {
+    2001: 'Matt',  2002: 'Mark',  2003: 'Luke',   2004: 'John',   2005: 'Acts',
+    2006: 'Rom',   2007: '1Cor',  2008: '2Cor',   2009: 'Gal',    2010: 'Eph',
+    2011: 'Phil',  2012: 'Col',   2013: '1Thess', 2014: '2Thess', 2015: '1Tim',
+    2016: '2Tim',  2017: 'Titus', 2018: 'Phlm',   2019: 'Heb',    2020: 'Jas',
+    2021: '1Pet',  2022: '2Pet',  2023: '1John',  2024: '2John',  2025: '3John',
+    2026: 'Jude',  2027: 'Rev',
+}
+
+
+def get_osis_by_id (id_):
+    """OSIS book code for a tbbb bk_id (e.g. 2004 -> 'John', 2027 -> 'Rev').
+
+    Falls back to the display siglum for OT/LXX books (where OSIS == siglum) and
+    to 'Bk<id>' for an unknown id, so it always returns a usable token."""
+    if id_ in _NT_OSIS:
+        return _NT_OSIS[id_]
+    b = get_book_by_id (id_)
+    return b[1] if b else ('Bk%d' % id_)
+
+
 def graphviz_layout (dot, format = 'dot'):
     """Call the GraphViz dot program to generate an image but mostly to precompute
     the graph layout.

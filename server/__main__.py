@@ -47,6 +47,7 @@ import comparison
 import editor
 import set_cover
 import checks
+import cbgm_ai
 
 dba = flask_sqlalchemy.SQLAlchemy()
 user, _role, _roles_users = login.declare_user_model_on(dba)
@@ -224,13 +225,13 @@ def build_instance_app(conf_path):
     sub_app.config['APPLICATION_ROOT'] = os.path.join(
         _main_app.config['APPLICATION_ROOT'], sub_app.config['APPLICATION_ROOT']
     )
-    for mod in (main, textflow, comparison, editor, set_cover, checks):
+    for mod in (main, textflow, comparison, editor, set_cover, checks, cbgm_ai):
         sub_app.register_blueprint(mod.bp)
     sub_app.register_blueprint(cbgm_backup.bp)  # /editorial/* (no init_app)
     sub_app.config.dba = db_tools.PostgreSQLEngine(**sub_app.config)
     sub_app.config['SQLALCHEMY_DATABASE_URI'] = _user_db_url
     do_init_app(sub_app)
-    for mod in (main, textflow, comparison, editor, set_cover, checks):
+    for mod in (main, textflow, comparison, editor, set_cover, checks, cbgm_ai):
         mod.init_app(sub_app)
     return sub_app
 

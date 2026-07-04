@@ -235,7 +235,7 @@ def stemma_edit (passage_or_id):
             user = flask_login.current_user
             cbgm_backup.on_edit (
                 current_app._get_current_object (),
-                current_app.config.get ('VMRCRE_PROJECT_ID'),
+                current_app.config.get ('VMRCRE_PROJECT_NAME'),
                 passage.start, passage.end,
                 getattr (user, 'username', None),
                 getattr (user, 'api_key', None))

@@ -102,10 +102,14 @@ def _existing_conf_pids(cfg):
 
 
 def _alloc_local_pid(cfg):
-    """Reserve a fresh local-project id (>= LOCAL_PID_BASE) for a dump-loaded
-    local project.  Avoids existing DBs and in-flight allocations, and reserves
-    the id under the status lock so two concurrent uploads can't pick the same
-    one."""
+    """Reserve a fresh LOCAL surrogate id (>= LOCAL_PID_BASE) for ANY import
+    (VMRCRE-backed Start, dump load, or purely-local dump).  The local id is the
+    project's identity everywhere local -- db name, conf, mount, status -- and is
+    autoinc, so a project imported from NTVMR and one from CoptOT never share a
+    local DB even when their backend projectIDs collide (both 43 -> distinct
+    local ids).  The backend projectID is NOT used for local identity.  Avoids
+    existing DBs and in-flight allocations, reserved under the status lock so two
+    concurrent imports can't pick the same one."""
     with _lock:
         used = _existing_conf_pids(cfg)
         used.update(int(k) for k in _status.keys() if str(k).isdigit())
@@ -124,6 +128,23 @@ def db_name_for(pid):
 
 def app_root_for(pid):
     return 'proj/%s' % _safe_pid(pid)
+
+
+def _resolve_local_pid(url_pid):
+    """Map a route <pid> to the LOCAL surrogate id to operate on.
+
+    Returns (local_pid, is_fresh).  The client knows only the remote projectID
+    before a project is imported, and the local id afterwards.  A url_pid
+    at/above LOCAL_PID_BASE is already a local id (reload of an existing local
+    project -> reuse it); anything below is a remote projectID for a FRESH
+    import, which MINTS a new local identity.  This is the clobber fix: a project
+    imported from NTVMR and one from CoptOT that happen to share a backend
+    projectID (both 43) get distinct local ids -> distinct local DBs, and never
+    overwrite each other.  See vmrcre/CONNECTIONS.md and the project-identity
+    model."""
+    if int(url_pid) >= LOCAL_PID_BASE:
+        return int(url_pid), False
+    return _alloc_local_pid(current_app.config), True
 
 
 def _require_can_start(action):
@@ -384,7 +405,13 @@ def _write_instance_conf(cfg, pid, name, dbname, object_part,
         'READ_ACCESS="public"\n'
         'READ_ACCESS_PRIVATE="Reviewer"\n'
         'WRITE_ACCESS="%(write)s"\n'
-        'VMRCRE_PROJECT_ID="%(pid)s"\n'
+        # CBGM_LOCAL_ID is this project's local identity (db name, mount, status)
+        # -- a locally-minted surrogate, the SAME key a purely-local dump project
+        # uses.  The remote projectID is deliberately not stored: it collides
+        # across backends (NTVMR-43 == CoptOT-43).  What binds this project to a
+        # backend is VMRCRE_PROJECT_NAME + CONNECTION_ID (a name, not a number).
+        # See the project-identity model / vmrcre/CONNECTIONS.md.
+        'CBGM_LOCAL_ID="%(pid)s"\n'
         'VMRCRE_PROJECT_NAME="%(name)s"\n'
         # NTVMR usergroup/task metadata captured at import time so the project
         # table can be rebuilt from local confs when the NTVMR is unreachable
@@ -428,11 +455,13 @@ def _write_instance_conf(cfg, pid, name, dbname, object_part,
 
 def _write_local_instance_conf(cfg, pid, name, dbname, object_part=''):
     """Write an instance .conf for a purely local, dump-loaded project (no VMRCRE
-    backing).  Deliberately carries NO VMRCRE_PROJECT_ID / CONNECTION_ID, so the
-    instance never binds to a backend and editorial sync stays off
+    backing).  Deliberately carries NO VMRCRE_PROJECT_NAME / CONNECTION_ID, so
+    the instance never binds to a backend and editorial sync stays off
     (login.editorial_sync_enabled); CBGM_LOCAL_PROJECT marks it for the project
-    list and CBGM_LOCAL_ID keys it.  WRITE_ACCESS defaults to public so a
-    not-logged-in user can edit their own local copy.  See vmrcre/CONNECTIONS.md.
+    list and CBGM_LOCAL_ID is its identity -- the same id key a backend-imported
+    project uses, so both kinds are handled uniformly.  WRITE_ACCESS defaults to
+    public so a not-logged-in user can edit their own local copy.  See
+    vmrcre/CONNECTIONS.md.
     """
 
     path = _conf_path_for(cfg, dbname)
@@ -447,7 +476,7 @@ def _write_local_instance_conf(cfg, pid, name, dbname, object_part=''):
         'READ_ACCESS_PRIVATE="Reviewer"\n'
         'WRITE_ACCESS="%(write)s"\n'
         # Purely local project loaded from a user's own CBGM dump -- not backed
-        # by any VMRCRE.  No VMRCRE_PROJECT_ID / CONNECTION_ID => no SSO binding
+        # by any VMRCRE.  No VMRCRE_PROJECT_NAME / CONNECTION_ID => no SSO binding
         # and no editorial sync; CBGM_LOCAL_PROJECT lists it under "Local".
         'CBGM_LOCAL_PROJECT="1"\n'
         'CBGM_LOCAL_ID="%(pid)s"\n'
@@ -468,6 +497,14 @@ def _write_local_instance_conf(cfg, pid, name, dbname, object_part=''):
 
 
 def _worker(app, pid, object_part, name, meta=None):
+    """Import a VMRCRE project into a fresh local CBGM database.
+
+    pid is the LOCAL surrogate id (identity of this local project everywhere --
+    db name, conf, mount, status).  The import itself keys on the project NAME,
+    never the remote projectID: two backends can reuse the same numeric id, so
+    the remote id is not trusted or stored locally.  See
+    projectmanagement/project/get (accepts projectName) and vmrcre/CONNECTIONS.md.
+    """
     with app.app_context():
         cfg = current_app.config
         dbname = db_name_for(pid)
@@ -495,7 +532,10 @@ def _worker(app, pid, object_part, name, meta=None):
                 _set(pid, state='importing', done=done, total=total,
                      message=message)
 
-            importer.import_project(object_part, pid, progress=progress)
+            # Import by NAME (not the local surrogate pid, and not the remote
+            # projectID): fetch_edition_base + apparatus fetch key on the project
+            # name / segmentGroupID=-1.
+            importer.import_project(object_part, name, progress=progress)
             conn.close()
 
             conf_path = _write_instance_conf(cfg, pid, name, dbname,
@@ -631,39 +671,49 @@ def load_dump(pid):
         return make_json_response({})
     _require_can_start('load a dump')
 
-    st = get_status(pid)
-    if st.get('state') in ('provisioning', 'importing', 'restoring'):
-        return make_json_response({'started': False, 'status': st})
+    # Reload of an existing local project reuses its id; a dump load against a
+    # bare remote projectID mints a fresh local identity (clobber fix).
+    local_pid, is_fresh = _resolve_local_pid(pid)
 
-    # A dump-load DROPs and recreates the DB, wiping the local outbox.  Refuse
-    # if there are unsynced edits, unless the client forces it (after Sync or
-    # an explicit discard).
-    if request.values.get('force') not in ('1', 'true', 'yes'):
-        pending = _pending_count(current_app.config, db_name_for(pid))
-        if pending:
-            return make_json_response(
-                {'started': False, 'needs_sync': True, 'pending': pending,
-                 'error': '%d unsynced edit(s) would be lost; sync or force'
-                          % pending})
+    if not is_fresh:
+        st = get_status(local_pid)
+        if st.get('state') in ('provisioning', 'importing', 'restoring'):
+            return make_json_response({'started': False, 'pid': local_pid,
+                                       'status': st})
+
+        # A dump-load DROPs and recreates the DB, wiping the local outbox.
+        # Refuse if there are unsynced edits, unless the client forces it (after
+        # Sync or an explicit discard).  Only an existing local project can have
+        # a DB / outbox to lose; a fresh import has nothing yet.
+        if request.values.get('force') not in ('1', 'true', 'yes'):
+            pending = _pending_count(current_app.config, db_name_for(local_pid))
+            if pending:
+                return make_json_response(
+                    {'started': False, 'pid': local_pid, 'needs_sync': True,
+                     'pending': pending,
+                     'error': '%d unsynced edit(s) would be lost; sync or force'
+                              % pending})
 
     f = request.files.get('dump')
     if f is None:
         return make_json_response({'started': False, 'error': 'no dump file'})
-    name = request.values.get('name') or ('Project %s' % pid)
+    name = request.values.get('name') or ('Project %s' % local_pid)
     object_part = request.values.get('object_part', '')
 
     fd, tmp = tempfile.mkstemp(suffix='.dump')
     os.close(fd)
     f.save(tmp)
 
-    _set(pid, state='provisioning', done=0, total=0, name=name, message='uploaded')
+    _set(local_pid, state='provisioning', done=0, total=0, name=name,
+         message='uploaded')
     t = threading.Thread(
         target=_worker_dump,
-        args=(current_app._get_current_object(), pid, name, tmp, object_part,
-              _import_meta(name)),
+        args=(current_app._get_current_object(), local_pid, name, tmp,
+              object_part, _import_meta(name)),
         daemon=True)
     t.start()
-    return make_json_response({'started': True, 'status': get_status(pid)})
+    return make_json_response({'started': True, 'pid': local_pid,
+                               'status': get_status(local_pid)})
 
 
 @bp.route('/load_local_dump.json', methods=['POST', 'OPTIONS'])
@@ -710,25 +760,33 @@ def start(pid):
         return make_json_response({})
     _require_can_start('start CBGM')
 
-    st = get_status(pid)
-    if st.get('state') in ('provisioning', 'importing'):
-        return make_json_response({'started': False, 'status': st})
-
     object_part = request.values.get('object_part')
     name = request.values.get('name') or ('Project %s' % pid)
     if not object_part:
         return make_json_response({'started': False,
                                    'error': 'object_part required'})
 
-    _set(pid, state='provisioning', done=0, total=0, name=name,
+    # Fresh import from a backend mints a local identity; a reload of an existing
+    # local project reuses its id.  The import keys on `name`, so the returned
+    # `pid` (local id) is what the client polls / opens with -- distinct per
+    # local project even when backend projectIDs collide across connections.
+    local_pid, is_fresh = _resolve_local_pid(pid)
+    if not is_fresh:
+        st = get_status(local_pid)
+        if st.get('state') in ('provisioning', 'importing'):
+            return make_json_response({'started': False, 'pid': local_pid,
+                                       'status': st})
+
+    _set(local_pid, state='provisioning', done=0, total=0, name=name,
          message='queued')
     t = threading.Thread(
         target=_worker,
-        args=(current_app._get_current_object(), pid, object_part, name,
+        args=(current_app._get_current_object(), local_pid, object_part, name,
               _import_meta(name)),
         daemon=True)
     t.start()
-    return make_json_response({'started': True, 'status': get_status(pid)})
+    return make_json_response({'started': True, 'pid': local_pid,
+                               'status': get_status(local_pid)})
 
 
 @bp.route('/projects/<int:pid>/recompute.json', methods=['POST', 'OPTIONS'])

@@ -688,15 +688,20 @@ class Importer:
 
     # -- edition base text (Leitzeile / nestle) ---------------------------- #
 
-    def fetch_edition_base(self, project_id):
+    def fetch_edition_base(self, project_name):
         """Return the project's 'Edition Basetext Default' (the edition docID
         whose running text becomes the Leitzeile / nestle table).
+
+        Keyed by project NAME, not the numeric projectID: the CBGM tool's local
+        identity is a name (+ backend), never the remote projectID -- two
+        backends can reuse the same numeric id, so it is not stored or trusted
+        locally.  projectmanagement/project/get accepts projectName OR projectID.
 
         Raises ValueError if it is not configured -- without it there is no
         edition text to import, and the apparatus display has no base line.
         """
         root = api_get(self.api_url, 'projectmanagement/project/get',
-                       {'projectID': project_id, 'detail': 'documents'})
+                       {'projectName': project_name, 'detail': 'documents'})
         project = root.find('.//project')
         edition = project.get('editionBaseDefault') if project is not None else None
         if not edition or edition == '0':
@@ -814,13 +819,15 @@ class Importer:
         self.conn.commit()
         return n_seg, n_wit
 
-    def import_project(self, object_part, project_id, progress=None):
+    def import_project(self, object_part, project_name, progress=None):
         """Import a whole project.
 
-        project_id is the NTVMR projectID; its 'Edition Basetext Default' is
-        required (it supplies the Leitzeile/edition text) and is validated up
-        front, before any database work, so a misconfigured project fails fast
-        with a clear message.
+        project_name is the NTVMR project NAME (the CBGM tool's cross-backend
+        identity -- the remote projectID is deliberately not used here; see
+        fetch_edition_base).  Its 'Edition Basetext Default' is required (it
+        supplies the Leitzeile/edition text) and is validated up front, before
+        any database work, so a misconfigured project fails fast with a clear
+        message.
 
         progress, if given, is called as progress(done, total, message) after
         the provisioning steps and after each verse, so a caller (e.g. the
@@ -833,7 +840,7 @@ class Importer:
 
         # Validate + capture the edition base text first: no DB side effects yet,
         # so an unconfigured project errors out cleanly.
-        self.edition_base = self.fetch_edition_base(project_id)
+        self.edition_base = self.fetch_edition_base(project_name)
         report(0, 0, 'preparing database')
         self.upgrade_schema()
         self.ensure_base_manuscripts()
@@ -886,9 +893,10 @@ def build_parser():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--object-part', required=True,
                    help="project objectPart / verse reference, e.g. '1Tim-Titus'")
-    p.add_argument('--project-id', required=True,
-                   help="NTVMR projectID (supplies the 'Edition Basetext "
-                        "Default' / Leitzeile text)")
+    p.add_argument('--project-name', required=True,
+                   help="NTVMR project NAME (supplies the 'Edition Basetext "
+                        "Default' / Leitzeile text; the tool keys on name, not "
+                        "the remote projectID)")
     p.add_argument('--api-url', default=os.environ.get('VMRCRE_API_URL', DEFAULT_API_URL),
                    help="NTVMR API base url")
     p.add_argument('--segment-group-id', default='-1',
@@ -917,7 +925,7 @@ def main():
         password=args.password, dbname=args.dbname)
     try:
         Importer(conn, args.api_url, args.segment_group_id, args.delay).import_project(
-            args.object_part, args.project_id)
+            args.object_part, args.project_name)
     finally:
         conn.close()
 

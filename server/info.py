@@ -81,16 +81,21 @@ def projects_json():
     # Did the active backend answer during this request?  None means "not probed".
     reachable = getattr(flask.g, 'vmrcre_reachable', None)
 
-    # Every locally-mounted project, keyed by (backend, project), so a project
-    # imported from a non-active backend still shows (and can't collide with a
-    # same-numbered project from another backend).
-    by_key = {(r['connection_id'], r['project_id']): r
+    # Every locally-mounted project, keyed by (backend, NAME).  Name -- not the
+    # numeric id -- is the cross-backend identity: the remote projectID collides
+    # across connections (NTVMR-43 == CoptOT-43), and locally-minted surrogate
+    # ids differ from the backend's, so only the name lines a mounted local
+    # project up with its live backend entry.  See the project-identity model.
+    by_key = {(r['connection_id'], r['name']): r
               for r in _projects_from_instances()}
 
     live_ok = False
     if authed and active:
-        mounted_active = {pid: row['instance_root']
-                          for (cid, pid), row in by_key.items()
+        # Local projects imported from the active backend, indexed by name, so a
+        # live project overlays onto its mounted local instance (carrying that
+        # instance's local id + Open link + import status).
+        mounted_active = {row['name']: row
+                          for (cid, key), row in by_key.items()
                           if cid == active_id}
         # A user's projects come from the usergroups they belong to; each
         # usergroup carries its project.
@@ -104,16 +109,21 @@ def projects_json():
             live_ok = True
             for ug in root.getElementsByTagName('userGroup'):
                 for p in ug.getElementsByTagName('project'):
-                    pid = p.getAttribute('projectID')
-                    by_key[(active_id, pid)] = {
-                        'project_id': pid,
-                        'name': p.getAttribute('name'),
+                    # The remote projectID is only the argument the client posts
+                    # to start.json for a NOT-yet-imported project; once imported
+                    # the mounted local row supplies the real (local) id.
+                    remote_pid = p.getAttribute('projectID')
+                    name = p.getAttribute('name')
+                    local = mounted_active.get(name) or {}
+                    by_key[(active_id, name)] = {
+                        'project_id': local.get('project_id') or remote_pid,
+                        'name': name,
                         'object_part': p.getAttribute('objectPart'),
                         'task_type_id': p.getAttribute('taskTypeID'),
                         'user_group': ug.getAttribute('name'),
                         'user_group_id': ug.getAttribute('userGroupID'),
-                        'instance_root': mounted_active.get(pid),
-                        'import': get_status(pid),
+                        'instance_root': local.get('instance_root'),
+                        'import': local.get('import') or get_status(remote_pid),
                         'connection_id': active_id,
                         'connection_label': active.get('label'),
                     }
@@ -155,14 +165,15 @@ def _projects_from_instances():
     rows = []
     for inst in instances.values():
         c = inst.config
-        pid = c.get('VMRCRE_PROJECT_ID')
-        # Purely local, dump-loaded projects have no VMRCRE_PROJECT_ID; they are
-        # marked with CBGM_LOCAL_PROJECT and keyed by their CBGM_LOCAL_ID.
-        is_local = not pid and c.get('CBGM_LOCAL_PROJECT')
-        if not pid and not is_local:
+        # A mounted CBGM project's local identity is CBGM_LOCAL_ID (both backend-
+        # imported and purely-local projects use it now).  Legacy backend imports
+        # predate the rename and still carry the id under VMRCRE_PROJECT_ID.
+        pid = c.get('CBGM_LOCAL_ID') or c.get('VMRCRE_PROJECT_ID')
+        if not pid:
             continue
+        # Purely local, dump-loaded projects carry no backend binding.
+        is_local = bool(c.get('CBGM_LOCAL_PROJECT'))
         if is_local:
-            pid = c.get('CBGM_LOCAL_ID') or ''
             cid = LOCAL_CONNECTION_ID
             label = 'Local'
         else:

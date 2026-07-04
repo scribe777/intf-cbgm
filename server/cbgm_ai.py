@@ -1,0 +1,269 @@
+# -*- encoding: utf-8 -*-
+
+"""AI local-stemma support for the CBGM API server.
+
+This module is the deterministic *digest layer* that turns a variation unit in
+the database into the compact JSON contract the CBGMLocalStemma task consumes
+(schema/cbgm-local-stemma-unit.schema.json in vmrcre/contrib/ai/cbgm-ai/). The
+heavy O(witnesses^2) affinity data stays in Postgres; what leaves here is a
+reading-scale digest:
+
+  - readings + their weight-bearing witnesses,
+  - coherence.perReading  — for each reading, the pre-genealogical
+    coherence-ranked candidate ancestor(s) (which reading do the closest
+    relatives of this reading's witnesses attest?),
+  - coherence.incoherentWitnesses — the Wachtel exceptions (a witness whose
+    nearest relative reads differently here).
+
+The same functions are the future *pull-mode* tool registry (see TOOLS): the
+push path calls them all up front to build the unit; an agentic mode would
+expose them as on-demand tools. All coherence comes from `affinity_view` (the
+PRE-genealogical, decision-independent view) so seeding never depends on the
+local stemma it is trying to propose.
+"""
+
+import collections
+
+import flask
+from flask import request, current_app
+import requests
+
+from ntg_common.db_tools import execute
+
+from helpers import parameters, Passage
+
+bp = flask.Blueprint ('cbgm_ai', __name__)
+
+SCHEMA_VERSION = '1.0'
+AI_SERVER_URL  = 'http://127.0.0.1:8078/localstemma'   # the warm JVM co-process
+
+
+def init_app (_app):
+    """ Initialize the flask app. """
+    pass
+
+
+# --------------------------------------------------------------------------- #
+#  Primitives — each is also a pull-mode tool (see TOOLS).                     #
+# --------------------------------------------------------------------------- #
+
+def readings_of (conn, pass_id):
+    """The non-lacunose readings of the passage: [(labez, lesart), ...]."""
+    res = execute (conn, """
+        SELECT labez, lesart
+        FROM readings
+        WHERE pass_id = :pass_id AND labez !~ '^z'
+        ORDER BY labez
+    """, dict (parameters, pass_id = pass_id))
+    return [(labez, lesart or '') for labez, lesart in res]
+
+
+def witnesses_of (conn, pass_id):
+    """labez -> [(hs, hsnr), ...] for the certain, non-z, collated witnesses."""
+    res = execute (conn, """
+        SELECT labez, hs, hsnr
+        FROM apparatus_view_agg
+        WHERE pass_id = :pass_id AND labez !~ '^z' AND certainty = 1.0
+        ORDER BY labez, hsnr
+    """, dict (parameters, pass_id = pass_id))
+    out = collections.defaultdict (list)
+    for labez, hs, hsnr in res:
+        out[labez].append ((hs, hsnr))
+    return out
+
+
+def reading_at (conn, ms_id, pass_id):
+    """The labez this witness reads at the passage, or None (lac/uncertain)."""
+    res = execute (conn, """
+        SELECT labez FROM apparatus_view_agg
+        WHERE pass_id = :pass_id AND ms_id = :ms_id AND certainty = 1.0
+    """, dict (parameters, pass_id = pass_id, ms_id = ms_id))
+    row = res.fetchone ()
+    return row[0] if row else None
+
+
+def closest_relatives (conn, ms_id, rg_id, k = 10):
+    """Top-k PRE-genealogical relatives of a witness in a range.
+
+    Returns [{ms_id, hs, affinity, common, equal, rank}] ranked by affinity —
+    the same window function textflow uses, on the decision-independent view.
+    """
+    res = execute (conn, """
+        SELECT ms_id2, hs, affinity, common, equal, rank FROM (
+            SELECT a.ms_id2,
+                   rank () OVER (ORDER BY a.affinity DESC, a.common DESC, a.ms_id2) AS rank,
+                   a.affinity, a.common, a.equal
+            FROM affinity_view a
+            WHERE a.ms_id1 = :ms_id AND a.rg_id = :rg_id
+        ) t JOIN manuscripts m ON m.ms_id = t.ms_id2
+        WHERE rank <= :k
+        ORDER BY rank
+    """, dict (parameters, ms_id = ms_id, rg_id = rg_id, k = k))
+    return [dict (ms_id = r[0], hs = r[1], affinity = float (r[2]),
+                  common = r[3], equal = r[4], rank = r[5]) for r in res]
+
+
+# --------------------------------------------------------------------------- #
+#  Reductions — the coherence digest.                                         #
+# --------------------------------------------------------------------------- #
+
+def per_reading_coherence (conn, pass_id, rg_id):
+    """For every reading, its coherence-ranked candidate ancestor readings.
+
+    For each witness w reading L here, take its nearest relative that reads a
+    *different* non-z reading; tally those differing readings per L. bestAncestor
+    is the most-attested; ancestorStrength = (that count) / (#witnesses of L).
+
+    Returns { labez -> {bestAncestor|None, ancestorStrength, candidates:[{labez,strength}]} }.
+    """
+    res = execute (conn, """
+        WITH att AS (
+            SELECT ms_id, labez FROM apparatus_view_agg
+            WHERE pass_id = :pass_id AND labez !~ '^z' AND certainty = 1.0
+        ),
+        rel AS (
+            SELECT att.labez AS lw, a.ms_id1 AS w, a.ms_id2 AS r,
+                   rank () OVER (PARTITION BY a.ms_id1
+                                 ORDER BY a.affinity DESC, a.common DESC, a.ms_id2) AS rk
+            FROM att JOIN affinity_view a ON a.ms_id1 = att.ms_id AND a.rg_id = :rg_id
+        ),
+        relread AS (
+            SELECT rel.lw, rel.w, rel.rk, av.labez AS lr
+            FROM rel JOIN apparatus_view_agg av ON av.ms_id = rel.r AND av.pass_id = :pass_id
+            WHERE av.certainty = 1.0 AND av.labez !~ '^z' AND av.labez <> rel.lw
+        ),
+        nearest AS (
+            SELECT DISTINCT ON (lw, w) lw, w, lr FROM relread ORDER BY lw, w, rk
+        )
+        SELECT lw, lr, count(*) AS n FROM nearest GROUP BY lw, lr ORDER BY lw, n DESC
+    """, dict (parameters, pass_id = pass_id, rg_id = rg_id))
+
+    totals = { labez: len (wits) for labez, wits in witnesses_of (conn, pass_id).items () }
+    agg = collections.OrderedDict ()
+    for lw, lr, n in res:
+        total = totals.get (lw, 0) or 1
+        entry = agg.setdefault (lw, { 'labez': lw, 'bestAncestor': None,
+                                      'ancestorStrength': 0.0, 'candidates': [] })
+        strength = round (n / total, 3)
+        entry['candidates'].append ({ 'labez': lr, 'strength': strength })
+        if strength > entry['ancestorStrength']:
+            entry['bestAncestor'], entry['ancestorStrength'] = lr, strength
+    # readings with no differing-relative signal look self-contained / initial
+    for labez in totals:
+        agg.setdefault (labez, { 'labez': labez, 'bestAncestor': None,
+                                 'ancestorStrength': 0.0, 'candidates': [] })
+    return agg
+
+
+def incoherent_witnesses (conn, pass_id, rg_id, cap = 15):
+    """Witnesses whose NEAREST relative reads differently here (the exceptions).
+
+    Returns [{siglum, reads, closestRelative, relativeReads}], capped.
+    """
+    res = execute (conn, """
+        WITH att AS (
+            SELECT ms_id, hs, labez FROM apparatus_view_agg
+            WHERE pass_id = :pass_id AND labez !~ '^z' AND certainty = 1.0
+        ),
+        rel AS (
+            SELECT att.ms_id AS w, att.hs AS whs, att.labez AS lw, a.ms_id2 AS r,
+                   rank () OVER (PARTITION BY a.ms_id1
+                                 ORDER BY a.affinity DESC, a.common DESC, a.ms_id2) AS rk
+            FROM att JOIN affinity_view a ON a.ms_id1 = att.ms_id AND a.rg_id = :rg_id
+        ),
+        rank1 AS (
+            SELECT DISTINCT ON (w) w, whs, lw, r FROM rel ORDER BY w, rk
+        )
+        SELECT r1.whs, r1.lw, m.hs, av.labez
+        FROM rank1 r1
+          JOIN apparatus_view_agg av ON av.ms_id = r1.r AND av.pass_id = :pass_id
+                                    AND av.certainty = 1.0 AND av.labez !~ '^z'
+          JOIN manuscripts m ON m.ms_id = r1.r
+        WHERE av.labez <> r1.lw
+        LIMIT :cap
+    """, dict (parameters, pass_id = pass_id, rg_id = rg_id, cap = cap))
+    return [dict (siglum = r[0], reads = r[1], closestRelative = r[2], relativeReads = r[3])
+            for r in res]
+
+
+# --------------------------------------------------------------------------- #
+#  Witness weighting + composition (the PUSH path).                           #
+# --------------------------------------------------------------------------- #
+
+def _weight_bearing (wits, name_cap):
+    """Split [(hs, hsnr), ...] into (named sigla, total count).
+
+    Names the most significant witnesses first (lowest hsnr: A, MT, majuscules,
+    versions ... come before the minuscule mass) up to name_cap; the rest are
+    represented only by the count. For small versional projects every witness
+    is named. NOTE: hsnr-order significance is a heuristic to refine per project.
+    """
+    named = [hs for hs, _ in wits[:name_cap]]
+    return named, len (wits)
+
+
+def build_unit (conn, pass_id, rg_id = None, k = 10, name_cap = 20):
+    """Assemble a schemaVersion-1.0 unit for the passage — exactly what
+    POST /localstemma validates and consumes."""
+    p = Passage (conn, pass_id)
+    if rg_id is None:
+        rg_id = p.range_id ()          # chapter-scoped coherence (CBGM norm)
+
+    texts = dict (readings_of (conn, pass_id))
+    wits  = witnesses_of (conn, pass_id)
+    coh   = per_reading_coherence (conn, pass_id, rg_id)
+
+    readings = []
+    for labez in sorted (set (texts) | set (wits)):
+        named, total = _weight_bearing (wits.get (labez, []), name_cap)
+        readings.append ({
+            'labez': labez,
+            'text': texts.get (labez, ''),
+            'witnesses': named,
+            'witnessCount': total,
+        })
+
+    unit = {
+        'schemaVersion': SCHEMA_VERSION,
+        'verse': p.to_hr (),
+        'readings': readings,
+        'coherence': {
+            'perReading': [ coh[labez] for labez in sorted (coh) ],
+            'incoherentWitnesses': incoherent_witnesses (conn, pass_id, rg_id),
+        },
+    }
+    return unit
+
+
+# --------------------------------------------------------------------------- #
+#  Pull-mode tool registry (same functions, on-demand). Documents the mini-MCP #
+#  surface an agentic variant would expose; not yet wired to a tool loop.      #
+# --------------------------------------------------------------------------- #
+
+TOOLS = {
+    'attestation':          { 'fn': witnesses_of,          'args': ['pass_id'] },
+    'reading_at':           { 'fn': reading_at,            'args': ['ms_id', 'pass_id'] },
+    'closest_relatives':    { 'fn': closest_relatives,     'args': ['ms_id', 'rg_id', 'k?'] },
+    'per_reading_coherence':{ 'fn': per_reading_coherence, 'args': ['pass_id', 'rg_id'] },
+}
+
+
+# --------------------------------------------------------------------------- #
+#  HTTP                                                                        #
+# --------------------------------------------------------------------------- #
+
+@bp.route ('/localstemma/<passage_or_id>')
+def local_stemma (passage_or_id):
+    """Build the unit for a passage and (unless ?dry_run) ask the AI server for
+    a proposed local stemma. ?engine=claude|gemini|... ?rg=<rg_id> ?dry_run=1."""
+    with current_app.config.dba.engine.begin () as conn:
+        p = Passage (conn, passage_or_id)
+        rg = request.args.get ('rg')
+        unit = build_unit (conn, p.pass_id, rg_id = int (rg) if rg else None)
+
+    if request.args.get ('dry_run'):
+        return flask.jsonify (unit)
+
+    engine = request.args.get ('engine', 'gemini')
+    resp = requests.post (AI_SERVER_URL, json = dict (unit, engine = engine), timeout = 180)
+    return flask.jsonify (resp.json ())
