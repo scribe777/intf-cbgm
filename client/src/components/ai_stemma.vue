@@ -36,6 +36,8 @@
         <button type="button" class="ai-close" @click="panel = null" title="close">✕</button>
       </div>
 
+      <div v-if="meterLabel" class="ai-meter">{{ meterLabel }}</div>
+
       <p v-if="panel.comments" class="ai-comments">{{ panel.comments }}</p>
 
       <div class="ai-edges">
@@ -114,6 +116,18 @@ export default {
             const c = this.panel && this.panel.confidence;
             return typeof c === 'number' ? c.toFixed (2) : String (c);
         },
+        /** "$0.0042 · 3.2s · 1.7k→1.7k tok" — cost, time, and token counts. */
+        meterLabel () {
+            const p = this.panel;
+            if (!p) return '';
+            const parts = [];
+            if (p.price != null)      parts.push ('$' + Number (p.price).toFixed (4));
+            if (p.durationMs != null) parts.push ((p.durationMs / 1000).toFixed (1) + 's');
+            if (p.tokensIn != null || p.tokensOut != null) {
+                parts.push (this.fmtTok (p.tokensIn) + '→' + this.fmtTok (p.tokensOut) + ' tok');
+            }
+            return parts.join (' · ');
+        },
     },
     'watch' : {
         // A new passage closes the open panel; an epoch bump (e.g. after
@@ -177,6 +191,10 @@ export default {
                         'model'      : res.model || vm.engine,
                         'confidence' : res.confidence,
                         'comments'   : res.comments,
+                        'price'      : res.price,
+                        'durationMs' : res.durationMs,
+                        'tokensIn'   : res.tokensIn,
+                        'tokensOut'  : res.tokensOut,
                         'stemma'     : (res.stemma || []).map ((e) => ({ ...e, '_done' : false })),
                     };
                     vm.refresh ();   // pick up the freshly-stored ai/ producer
@@ -227,8 +245,17 @@ export default {
                 'model'      : s.model || frag.producer,
                 'confidence' : s.confidence,
                 'comments'   : s.comments,
+                'price'      : s.price,
+                'durationMs' : s.durationMs,
+                'tokensIn'   : s.tokensIn,
+                'tokensOut'  : s.tokensOut,
                 'stemma'     : stemma,
             };
+        },
+        /** Compact token count: 1740 -> "1.7k". */
+        fmtTok (n) {
+            if (n == null) return '?';
+            return n >= 1000 ? (n / 1000).toFixed (1) + 'k' : String (n);
         },
     },
 };
@@ -298,6 +325,13 @@ $ai-soft: #8b6df0;
 .ai-close { background: none; border: none; color: #8b93a7; cursor: pointer; font-size: 0.9rem; }
 .ai-close:hover { color: #fff; }
 
+.ai-meter {
+    margin-top: 0.45em;
+    font-family: monospace;
+    font-size: 0.72rem;
+    color: #8b93a7;
+    letter-spacing: 0.02em;
+}
 .ai-comments {
     margin: 0.6em 0 0.5em;
     font-size: 0.82rem; line-height: 1.4; color: #c7ccda;

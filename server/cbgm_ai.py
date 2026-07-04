@@ -69,6 +69,24 @@ def _model_catalogue ():
         return {}
 
 
+def _price (engine, model_id, tokens_in, tokens_out, cached):
+    """USD cost of a call from the registry pricing (all fields per 1M tokens):
+    cached input bills at cachedRead (default in/4), the rest of input at `in`,
+    output (incl. reasoning) at `out`.  Returns a float, or None if the model's
+    pricing is unknown."""
+    m = next ((x for x in (_model_catalogue ().get (engine) or [])
+               if isinstance (x, dict) and x.get ('id') == model_id), None)
+    if not m:
+        return None
+    p_in  = m.get ('in') or 0
+    p_out = m.get ('out') or 0
+    p_cached = m.get ('cachedRead', p_in / 4.0)
+    cached = min (cached or 0, tokens_in or 0)
+    price = ((tokens_in - cached) * p_in + cached * p_cached
+             + tokens_out * p_out) / 1e6
+    return round (price, 6)
+
+
 def init_app (_app):
     """ Initialize the flask app. """
     pass
@@ -359,6 +377,12 @@ def suggestion_fragment (begadr, endadr, result):
                for e in stemma if e.get ('reading')]
     rationale = { e['reading']: e.get ('rationale', '')
                   for e in stemma if e.get ('reading') }
+    tokens_in  = result.get ('tokensIn') or 0
+    tokens_out = result.get ('tokensOut') or 0
+    price = result.get ('price')
+    if price is None:
+        price = _price (result.get ('engine'), result.get ('model'),
+                        tokens_in, tokens_out, result.get ('cachedTokens') or 0)
     return {
         'begadr': int (begadr), 'endadr': int (endadr),
         'locstem': locstem, 'cliques': [], 'ms_cliques': [], 'notes': [],
@@ -371,7 +395,13 @@ def suggestion_fragment (begadr, endadr, result):
             'comments': result.get ('comments'),
             'rationale': rationale,
             'attempts': result.get ('attempts'),
-            'tokensOut': result.get ('tokensOut'),
+            # metering, preserved so a re-opened suggestion still shows its
+            # cost + time (the panel renders these).
+            'tokensIn': tokens_in,
+            'tokensOut': tokens_out,
+            'cachedTokens': result.get ('cachedTokens'),
+            'durationMs': result.get ('durationMs'),
+            'price': price,
         },
     }
 
@@ -437,6 +467,10 @@ def suggest_stemma (passage_or_id):
                                 'result': result }), (503 if not reachable else 200)
 
     model = result.get ('model') or result.get ('engine') or engine
+    result['price'] = _price (result.get ('engine') or engine, model,
+                              result.get ('tokensIn') or 0,
+                              result.get ('tokensOut') or 0,
+                              result.get ('cachedTokens') or 0)
     fragment = suggestion_fragment (begadr, endadr, result)
 
     user = flask_login.current_user
