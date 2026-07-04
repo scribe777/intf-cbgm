@@ -20,3 +20,8 @@ services:
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       # Optional: default engine when the request doesn't name one (else "claude").
       AI_DEFAULT_ENGINE: "${AI_DEFAULT_ENGINE:-gemini}"
+      # Optional: per-engine model for the local-stemma task (same names as
+      # sysconfig.properties). Omit to use each engine's built-in default model.
+      CLAUDE_CBGM_LOCAL_STEMMA_DEFAULT_MODEL: "${CLAUDE_CBGM_LOCAL_STEMMA_DEFAULT_MODEL:-}"
+      GEMINI_CBGM_LOCAL_STEMMA_DEFAULT_MODEL: "${GEMINI_CBGM_LOCAL_STEMMA_DEFAULT_MODEL:-}"
+      OPENAI_CBGM_LOCAL_STEMMA_DEFAULT_MODEL: "${OPENAI_CBGM_LOCAL_STEMMA_DEFAULT_MODEL:-}"
