@@ -67,7 +67,7 @@ export default {
         },
     },
     'watch' : {
-        epoch () { this.refresh (); },     // re-check right after an edit
+        epoch () { this._catchupTries = 0; this.refresh (); },  // fresh edit -> fast catch-up again
     },
     'mounted' : function () {
         this.refresh ();
@@ -83,6 +83,7 @@ export default {
         if (this.timer) {
             clearInterval (this.timer);
         }
+        if (this._catchupTimer) { clearTimeout (this._catchupTimer); this._catchupTimer = null; }
     },
     'methods' : {
         refresh () {
@@ -97,8 +98,22 @@ export default {
                     // default true so a normal single-backend project is unaffected
                     vm.connection_active = d.connection_active !== false;
                     vm.loaded   = true;
+                    vm.scheduleCatchup ();
                 })
                 .catch (() => { /* not in a project instance / not logged in */ });
+        },
+        /** The flush to the NTVMR is async + debounced, so the refresh fired at
+         *  edit time still counts the edit as unsynced.  While the count is >0,
+         *  re-poll quickly (past the 45s periodic timer) so "N unsynced" clears
+         *  promptly once the flush lands; back off after ~30s so a genuinely
+         *  stuck (offline / no-role) edit falls back to the slow periodic poll. */
+        scheduleCatchup () {
+            const vm = this;
+            if (vm._catchupTimer) { clearTimeout (vm._catchupTimer); vm._catchupTimer = null; }
+            if (vm.count === 0) { vm._catchupTries = 0; return; }
+            vm._catchupTries = (vm._catchupTries || 0) + 1;
+            if (vm._catchupTries > 6) return;   // hand back to the 45s periodic timer
+            vm._catchupTimer = setTimeout (() => { vm._catchupTimer = null; vm.refresh (); }, 5000);
         },
         sync_now () {
             const vm = this;

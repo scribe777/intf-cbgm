@@ -6,6 +6,7 @@
        @ai_proposal="on_ai_proposal"
        @ai_hover="on_ai_hover"
        @stemma_state="on_stemma_state"
+       @load_editor="on_load_editor"
   >
     <div class="container bs-docs-container">
       <!-- the parent for all floating cards must be at the top of the page so
@@ -35,7 +36,7 @@
       <card class="card-local-stemma card-wide">
         <card-caption>
           Local Stemma
-          <editor-decisions :pass_id="pass_id" :epoch="epoch" />
+          <editor-decisions ref="editor_decisions" :pass_id="pass_id" :epoch="epoch" />
           <ai-stemma :pass_id="pass_id" :epoch="epoch" :stemma_state="stemmaState" />
         </card-caption>
 
@@ -233,6 +234,15 @@ export default {
          *  can distinguish real change-suggestions from already-selected paths. */
         on_stemma_state (event) {
             this.stemmaState = (event.detail && event.detail.data) || null;
+        },
+        /** A human-editor pill in the AI panel's contributor strip — route to
+         *  editor_decisions, which owns the load + unsynced-changes confirm. */
+        on_load_editor (event) {
+            const who = event.detail && event.detail.data;
+            const ed  = this.$refs.editor_decisions;
+            if (who && ed) {
+                ed.load_user (who);
+            }
         },
         /**
          * Scroll to the "Coherence in Attestations" card and load the given

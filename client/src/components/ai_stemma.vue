@@ -1,25 +1,51 @@
 <template>
   <span class="ai-stemma">
-    <!-- trigger + engine -->
-    <button type="button" class="btn btn-sm ai-suggest-btn"
-            :disabled="busy" @click="suggest ()"
-            title="Ask an AI to propose a local stemma for this passage.">
-      <span class="ai-spark">✦</span>
-      {{ busy ? 'Thinking…' : 'Suggest local stemma' }}
-    </button>
-    <select v-model="selected" class="ai-engine" :disabled="busy || !catalogue.length"
-            title="AI engine / model">
-      <optgroup v-for="grp in catalogue" :key="grp.engine" :label="grp.label">
-        <option v-for="m in grp.models" :key="grp.engine + '::' + m.id"
-                :value="grp.engine + '::' + m.id">{{ m.name }}</option>
-      </optgroup>
-    </select>
-
-    <!-- staged-suggestion hint when one already exists and none is open -->
-    <span v-if="!panel && stagedProducers.length" class="ai-staged-hint">
-      <button type="button" class="btn btn-sm ai-review-btn" @click="review ()">
-        ✦ review {{ stagedProducers.join (', ') }}
+    <!-- staged AI suggestions at this passage: producer pills continuing the
+         editor-decisions strip (same .ed-person pill system as the review
+         dialog's contributor list); click one to review that suggestion -->
+    <span v-if="staged.length" class="ed-contrib ai-staged">
+      <button v-for="s in staged" :key="s.producer" type="button"
+              class="ed-person ed-ai"
+              :class="{ 'ed-loaded' : panel && panel.producer === s.producer }"
+              :disabled="busy"
+              :title="'Review ' + s.producer + '’s staged local-stemma suggestion'"
+              @click="review (s)">
+        {{ s.producer }}<span class="ed-tier">ai</span>
       </button>
+    </span>
+
+    <!-- trigger: split button — main segment asks the current model, the caret
+         opens the engine/model menu (shown model lives in tooltip + menu) -->
+    <span class="ai-split">
+      <button type="button" class="btn btn-sm ai-suggest-btn ai-split-main"
+              :disabled="busy" @click="suggest ()"
+              :title="'Ask ' + selectedName + ' to propose a local stemma for this passage.'">
+        <span class="ai-spark">✦</span>
+        {{ busy ? 'Thinking…' : 'Suggest local stemma' }}
+      </button>
+      <button type="button" class="btn btn-sm ai-suggest-btn ai-split-caret"
+              :disabled="busy || !catalogue.length"
+              :title="'Model: ' + selectedName + ' — click to change'"
+              @click="menuOpen = !menuOpen">▾</button>
+      <div v-if="menuOpen" class="ai-menu">
+        <template v-for="grp in catalogue">
+          <div :key="'g/' + grp.engine" class="ai-menu-group">{{ grp.label }}</div>
+          <button v-for="m in grp.models" :key="grp.engine + '::' + m.id"
+                  type="button" class="ai-menu-item"
+                  :class="{ 'ai-menu-sel' : selected === grp.engine + '::' + m.id }"
+                  @click="pick (grp.engine + '::' + m.id)">
+            <span class="ai-menu-check">{{ selected === grp.engine + '::' + m.id ? '✓' : '' }}</span>
+            {{ m.name }}
+          </button>
+        </template>
+      </div>
+    </span>
+
+    <!-- couldn't reach the NTVMR store on the last load (breaker open, offline);
+         the list is kept, not blanked — offer a retry -->
+    <span v-if="remoteStale" class="ai-stale" title="Couldn't reach the NTVMR to load staged suggestions. Any shown are from an earlier load.">
+      <span class="ai-stale-dot"></span>NTVMR unreachable
+      <button type="button" class="btn btn-sm ai-retry-btn" @click="refresh ()">retry</button>
     </span>
 
     <!-- the review panel (floats below the caption) -->
@@ -60,26 +86,32 @@
              :class="{ 'ai-card-init' : e.source === '*', 'ai-card-done' : e._done,
                        'ai-card-agrees' : agrees (e) }"
              @mouseenter="hover (e)" @mouseleave="hover (null)">
-          <div class="ai-card-head">
-            <span class="ai-tok ai-tok-reading">{{ e.reading }}</span>
-            <span class="ai-tok-arrow">←</span>
+          <!-- the proposed edge as a top-down mini-stemma (source over
+               reading, like the graph), in a reserved left column -->
+          <div class="ai-card-edge" :title="e.reading + ' ← ' + e.source">
             <span class="ai-tok ai-tok-source">{{ e.source }}</span>
-            <span v-if="agrees (e)" class="ai-card-badge ai-badge-set">✓ set</span>
-            <span v-else-if="e.source === '*'" class="ai-card-badge">initial</span>
+            <span class="ai-edge-arrow">↓</span>
+            <span class="ai-tok ai-tok-reading">{{ e.reading }}</span>
           </div>
-          <p v-if="e.rationale" class="ai-card-reason">{{ e.rationale }}</p>
-          <div class="ai-card-actions">
-            <button type="button" class="ai-card-accept"
-                    :disabled="e.source === '*' || busy || e._done || agrees (e)"
-                    :title="e.source === '*' ? 'initial-text edge — set via the editor' : 'Apply ' + e.reading + ' ← ' + e.source"
-                    @click="accept (e)">
-              {{ e._done ? '✓ applied' : (agrees (e) ? '✓ already set' : 'Accept') }}
-            </button>
-            <button type="button" class="ai-card-dismiss"
-                    :disabled="busy" title="Dismiss this suggestion"
-                    @click="dismiss (e)">
-              Dismiss
-            </button>
+          <div class="ai-card-main">
+            <div v-if="agrees (e) || e.source === '*'" class="ai-card-head">
+              <span v-if="agrees (e)" class="ai-card-badge ai-badge-set">✓ set</span>
+              <span v-else class="ai-card-badge">initial</span>
+            </div>
+            <p v-if="e.rationale" class="ai-card-reason">{{ e.rationale }}</p>
+            <div class="ai-card-actions">
+              <button type="button" class="ai-card-accept"
+                      :disabled="e.source === '*' || busy || e._done || agrees (e)"
+                      :title="e.source === '*' ? 'initial-text edge — set via the editor' : 'Apply ' + e.reading + ' ← ' + e.source"
+                      @click="accept (e)">
+                {{ e._done ? '✓ applied' : (agrees (e) ? '✓ already set' : 'Accept') }}
+              </button>
+              <button type="button" class="ai-card-dismiss"
+                      :disabled="busy" title="Dismiss this suggestion"
+                      @click="dismiss (e)">
+                Dismiss
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -92,10 +124,18 @@
 
       <div v-if="contributors.length" class="ai-contrib">
         <span class="ai-contrib-lab">at this passage:</span>
-        <span v-for="c in contributors" :key="c.tier + '/' + c.producer"
-              class="ai-person" :class="'tier-' + c.tier">
+        <button v-for="c in contributors" :key="c.tier + '/' + c.producer"
+                type="button" class="ai-person"
+                :class="['tier-' + c.tier,
+                         { 'ai-person-active' : c.tier === 'ai' && panel
+                                                && panel.producer === c.producer }]"
+                :disabled="busy"
+                :title="c.tier === 'ai'
+                        ? 'Review ' + c.producer + '’s staged local-stemma suggestion'
+                        : 'Load ' + c.producer + '’s saved decisions at this passage'"
+                @click="open_contributor (c)">
           {{ c.producer }}<span class="ai-tier">{{ c.tier }}</span>
-        </span>
+        </button>
       </div>
     </div>
 
@@ -134,13 +174,28 @@ export default {
             'contributors' : [],     // [{ producer, tier }]
             'staged'       : [],     // ai-tier fragments already stored here
             'showAll'      : false,  // reveal edges the AI proposes that are already set
+            'remoteStale'  : false,  // last load couldn't reach the NTVMR store
+            'menuOpen'     : false,  // engine/model dropdown of the split button
         };
+    },
+    'beforeDestroy' : function () {
+        if (this._retryTimer) { clearTimeout (this._retryTimer); this._retryTimer = null; }
+        if (this._closeMenu) {
+            document.removeEventListener ('click', this._closeMenu, true);
+            this._closeMenu = null;
+        }
     },
     'computed' : {
         engine () { return (this.selected.split ('::')[0]) || 'gemini'; },
         model  () { return this.selected.split ('::')[1] || ''; },
-        stagedProducers () {
-            return this.staged.map ((s) => s.producer);
+        /** Display name of the selected model (for tooltips). */
+        selectedName () {
+            for (const grp of this.catalogue) {
+                const m = grp.models.find (
+                    (x) => this.selected === grp.engine + '::' + x.id);
+                if (m) return m.name;
+            }
+            return this.engine;
         },
         /** Proposed edges that differ from the current stemma (real changes). */
         changeEdges () {
@@ -191,6 +246,18 @@ export default {
                 ? p.stemma.map ((e) => ({ 'reading' : e.reading, 'source' : e.source }))
                 : null);
         },
+        // Close the model menu on any click outside the component.
+        menuOpen (open) {
+            if (open && !this._closeMenu) {
+                this._closeMenu = (ev) => {
+                    if (!this.$el.contains (ev.target)) this.menuOpen = false;
+                };
+                document.addEventListener ('click', this._closeMenu, true);
+            } else if (!open && this._closeMenu) {
+                document.removeEventListener ('click', this._closeMenu, true);
+                this._closeMenu = null;
+            }
+        },
     },
     'mounted' : function () { this.loadModels (); this.refresh (); },
     'methods' : {
@@ -210,22 +277,62 @@ export default {
                 })
                 .catch (() => { vm.catalogue = []; });
         },
-        /** Load any staged AI suggestions + contributors for this passage. */
+        /** Load any staged AI suggestions + contributors for this passage.
+         *  If the backend couldn't reach the NTVMR (reachable:false, e.g. the
+         *  circuit breaker is open), KEEP whatever we already have and retry —
+         *  a transient breaker window must not silently blank the review rail. */
         refresh () {
             const vm = this;
-            if (!vm.pass_id) { vm.staged = []; vm.contributors = []; return; }
+            if (!vm.pass_id) { vm.staged = []; vm.contributors = []; vm.remoteStale = false; return; }
             vm.get ('suggestions/' + vm.pass_id)
                 .then ((r) => {
                     const d = r.data.data || r.data;
+                    if (d.reachable === false) {
+                        vm.remoteStale = true;    // couldn't reach the store; keep list, retry
+                        vm.scheduleRetry ();
+                        return;
+                    }
+                    vm.remoteStale = false;
                     vm.staged = d.suggestions || [];
                     vm.contributors = d.contributors || [];
                 })
-                .catch (() => { vm.staged = []; vm.contributors = []; });
+                .catch (() => {
+                    // local API blip — don't wipe a good list; flag + retry
+                    vm.remoteStale = true;
+                    vm.scheduleRetry ();
+                });
         },
-        /** Open a staged suggestion (the first one) in the review panel. */
-        review () {
-            const s = this.staged[0];
-            if (s) this.panel = this.fragmentToPanel (s);
+        /** Retry the suggestion load once the breaker has likely closed. */
+        scheduleRetry () {
+            const vm = this;
+            if (vm._retryTimer) return;   // one pending retry at a time
+            vm._retryTimer = setTimeout (() => { vm._retryTimer = null; vm.refresh (); }, 16000);
+        },
+        /** Pick a model from the split-button menu. */
+        pick (value) {
+            this.selected = value;
+            this.menuOpen = false;
+        },
+        /** A contributor pill in the panel's "at this passage" strip: an AI
+         *  producer opens (or switches to) its staged suggestion; a human
+         *  editor loads their saved decisions (handled by editor_decisions,
+         *  which owns the unsynced-changes confirm — see coherence.vue). */
+        open_contributor (c) {
+            if (c.tier === 'ai') {
+                const frag = this.staged.find ((s) => s.producer === c.producer);
+                if (frag) this.review (frag);
+                return;
+            }
+            this.$trigger ('load_editor', c.producer);
+        },
+        /** Open a staged suggestion in the review panel (clicking the pill of
+         *  the one already open closes it again). */
+        review (frag) {
+            if (this.panel && this.panel.producer === frag.producer) {
+                this.panel = null;
+                return;
+            }
+            this.panel = this.fragmentToPanel (frag);
         },
         /** Ask the model for a fresh suggestion. */
         suggest () {
@@ -246,6 +353,7 @@ export default {
                     }
                     vm.panel = {
                         'model'      : res.model || vm.engine,
+                        'producer'   : res.model || vm.engine,
                         'confidence' : res.confidence,
                         'comments'   : res.comments,
                         'price'      : res.price,
@@ -325,6 +433,7 @@ export default {
             }));
             return {
                 'model'      : s.model || frag.producer,
+                'producer'   : frag.producer,
                 'confidence' : s.confidence,
                 'comments'   : s.comments,
                 'price'      : s.price,
@@ -364,19 +473,79 @@ $ai-soft: #8b6df0;
     &:disabled { opacity: 0.7; }
 }
 .ai-spark { margin-right: 0.3em; }
-.ai-engine {
-    margin-left: 0.35em;
-    font-size: 0.8rem;
-    border: 1px solid #ccc;
-    border-radius: 0.2rem;
-    padding: 0.05em 0.2em;
+/* split button: [ ✦ Suggest local stemma |▾ ] — the caret opens the
+   engine/model menu; the wide native <select> is gone */
+.ai-split { position: relative; display: inline-flex; vertical-align: middle; }
+.ai-split-main {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: none;
 }
-.ai-review-btn {
-    margin-left: 0.5em;
-    color: $ai;
-    border: 1px solid rgba(118, 87, 230, 0.5);
-    background: rgba(139, 109, 240, 0.08);
-    padding: 0.1em 0.6em;
+.ai-split-caret {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.35);
+    padding: 0.1em 0.45em;
+    font-size: 0.75rem;
+}
+.ai-menu {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 13em;
+    max-height: 60vh;
+    overflow-y: auto;
+    background: #1f2740;
+    border: 1px solid rgba(139, 109, 240, 0.4);
+    border-radius: 0.5em;
+    box-shadow: 0 16px 44px -16px rgba(0, 0, 0, 0.7);
+    padding: 0.3em;
+    text-align: left;
+    font-weight: normal;
+}
+.ai-menu-group {
+    padding: 0.4em 0.6em 0.1em;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #636b82;
+}
+.ai-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    width: 100%;
+    padding: 0.25em 0.6em;
+    border: none;
+    border-radius: 0.35em;
+    background: none;
+    color: #c9cede;
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
+}
+.ai-menu-item:hover { background: rgba(139, 109, 240, 0.15); color: #fff; }
+.ai-menu-item.ai-menu-sel { color: $ai-soft; }
+.ai-menu-check { width: 1em; flex: none; color: $ai-soft; }
+/* staged-producer pills continue the editor-decisions strip; the shared
+   .ed-person pill system lives in editor_decisions.vue */
+.ai-staged {
+    margin-right: 0.5em;
+    vertical-align: middle;
+}
+.ai-stale {
+    margin-left: 0.6em; font-size: 0.78rem; color: #b8860b;
+    display: inline-flex; align-items: center; gap: 0.4em; vertical-align: middle;
+}
+.ai-stale-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #e0a020;
+    box-shadow: 0 0 6px rgba(224, 160, 32, 0.7);
+}
+.ai-retry-btn {
+    color: #b8860b; border: 1px solid rgba(184, 134, 11, 0.5);
+    background: rgba(224, 160, 32, 0.08); padding: 0.05em 0.55em; font-size: 0.75rem;
+    &:hover { background: rgba(224, 160, 32, 0.16); color: #8a6608; }
 }
 
 .ai-panel {
@@ -429,6 +598,9 @@ $ai-soft: #8b6df0;
    emphasises its ghost edge and pulses its nodes on the stemma (see hover()). */
 .ai-cards { display: flex; flex-direction: column; gap: 0.5em; margin-top: 0.2em; }
 .ai-card {
+    display: flex;
+    align-items: stretch;
+    gap: 0.65em;
     padding: 0.55em 0.6em;
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 0.5em;
@@ -436,6 +608,21 @@ $ai-soft: #8b6df0;
     cursor: pointer;
     transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
+/* reserved left column: the edge as a top-down mini-stemma (source over
+   reading, matching the graph's flow) */
+.ai-card-edge {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1em;
+    min-width: 2.6em;
+    padding-right: 0.6em;
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
+}
+.ai-edge-arrow { color: $ai-soft; line-height: 1; font-size: 0.9rem; }
+.ai-card-main { flex: 1; min-width: 0; }
 .ai-card:hover {
     border-color: rgba(139, 109, 240, 0.7);
     box-shadow: 0 2px 12px -3px rgba(139, 109, 240, 0.55);
@@ -453,7 +640,6 @@ $ai-soft: #8b6df0;
 }
 .ai-tok-reading { background: rgba(90, 160, 115, 0.24); color: #cde7d6; }
 .ai-tok-source  { background: rgba(230, 170, 70, 0.20);  color: #f2d9a8; }
-.ai-tok-arrow   { color: $ai-soft; padding: 0 0.15em; }
 .ai-card-badge {
     margin-left: auto; font-size: 0.62rem; text-transform: uppercase;
     letter-spacing: 0.05em; padding: 0.1em 0.4em; border-radius: 0.25em;
@@ -512,12 +698,28 @@ $ai-soft: #8b6df0;
     font-size: 0.75rem;
 }
 .ai-contrib-lab { color: #636b82; }
+/* clickable, like the card's .ed-person pills: AI producers open their staged
+   suggestion, human editors load their decisions */
 .ai-person {
     display: inline-flex; align-items: center; gap: 0.35em;
     padding: 0.1em 0.5em; border-radius: 1em;
     border: 1px solid rgba(255, 255, 255, 0.1); color: #c9cede;
+    background: none; font: inherit; font-size: inherit; line-height: inherit;
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s, color 0.12s;
 }
+.ai-person:hover {
+    border-color: rgba(139, 109, 240, 0.7);
+    background: rgba(139, 109, 240, 0.12);
+    color: #e7e9f0;
+}
+.ai-person:disabled { opacity: 0.55; cursor: default; }
 .ai-person.tier-ai { border-color: rgba(139, 109, 240, 0.5); background: rgba(139, 109, 240, 0.1); }
+.ai-person.ai-person-active {
+    border-color: $ai-soft;
+    background: rgba(139, 109, 240, 0.25);
+    color: #fff;
+}
 .ai-tier {
     font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em;
     color: #636b82;
