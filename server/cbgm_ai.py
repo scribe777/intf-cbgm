@@ -318,6 +318,36 @@ def suggestion_fragment (begadr, endadr, result):
     }
 
 
+@bp.route ('/suggestions/<passage_or_id>')
+def suggestions_at (passage_or_id):
+    """Contributors + any STAGED AI suggestions at a passage, for the review UI.
+
+    Returns { ref, contributors: [{producer, tier}], suggestions: [fragment...] }.
+    contributors is every producer with data here (AI models + human editors, so
+    the "who has data" strip can show them side by side); suggestions is the
+    ai-tier fragments (locstem + the `suggestions` provenance block) the client
+    renders in review mode.  Read-only; no model call.
+    """
+    import cbgm_backup   # lazy: same rationale as suggest_stemma
+    user = flask_login.current_user
+    sh = getattr (user, 'api_key', None)
+    project = current_app.config.get ('VMRCRE_PROJECT_NAME')
+    with current_app.config.dba.engine.begin () as conn:
+        p = Passage (conn, passage_or_id)
+        begadr, endadr = int (p.start), int (p.end)
+    ref = cbgm_backup.passage_ref (begadr, endadr)
+
+    contributors = cbgm_backup.list_segment_contributors (project, ref, sh) if project else []
+    suggestions = []
+    for c in contributors:
+        if c['tier'] == 'ai':
+            frag = cbgm_backup.get_segment (project, ref, c['producer'], sh, state = 'ai')
+            if frag is not None:
+                suggestions.append (dict (frag, producer = c['producer']))
+    return flask.jsonify ({ 'ref': ref, 'contributors': contributors,
+                            'suggestions': suggestions })
+
+
 @bp.route ('/suggest-stemma/<passage_or_id>', methods = ['POST', 'OPTIONS'])
 def suggest_stemma (passage_or_id):
     """Generate an AI local-stemma suggestion and STAGE it in the ai/ tier.

@@ -33,6 +33,7 @@
         <card-caption>
           Local Stemma
           <editor-decisions :pass_id="pass_id" :epoch="epoch" />
+          <ai-stemma :pass_id="pass_id" :epoch="epoch" />
         </card-caption>
 
         <localstemma :pass_id="pass_id" :epoch="epoch" />
@@ -115,6 +116,7 @@ import apparatus        from 'apparatus.vue';
 import d3_chord_layout  from 'd3_chord_layout.vue';
 import d3_stemma_layout from 'd3_stemma_layout.vue';
 import editor_decisions from 'editor_decisions.vue';
+import ai_stemma        from 'ai_stemma.vue';
 import leitzeile        from 'leitzeile.vue';
 import local_stemma     from 'local_stemma.vue';
 import notes            from 'notes.vue';
@@ -138,6 +140,7 @@ Vue.component ('connectivity', connectivity);
 Vue.component ('d3chord',      d3_chord_layout);
 Vue.component ('d3stemma',     d3_stemma_layout);
 Vue.component ('editor-decisions', editor_decisions);
+Vue.component ('ai-stemma',    ai_stemma);
 Vue.component ('labezator',    labezator);
 Vue.component ('leitzeile',    leitzeile);
 Vue.component ('localstemma',  local_stemma);
