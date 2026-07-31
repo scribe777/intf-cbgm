@@ -6,7 +6,6 @@
 # Ships no apparatus data: the database image carries only an empty CBGM schema
 # template (cbgm_template).  Each project's data is imported on demand from the
 # NTVMR when a user starts CBGM on it.
-version: "3"
 
 services:
   # Service name must stay "ntg-db-server" (the app's PGHOST / .pgpass key).
