@@ -51,6 +51,121 @@
         style="display: none"
         @change="local_dump_selected"
       />
+      <div
+        v-if="start_dialog"
+        class="cbgm-start-overlay"
+        @click.self="start_dialog = null"
+      >
+        <div class="cbgm-start-dialog">
+          <h5>Import &ldquo;{{ start_dialog.name }}&rdquo;</h5>
+          <p class="text-muted small">
+            Choose which witnesses go into the CBGM database. The defaults
+            match the standard behaviour; changing them later means reloading
+            the project.
+          </p>
+          <div class="form-group">
+            <label for="cbgm-doc-ranges">Document ID ranges</label>
+            <input
+              id="cbgm-doc-ranges"
+              v-model="start_options.doc_ranges"
+              class="form-control form-control-sm"
+              placeholder="e.g. 10000-29999, 32344"
+            />
+            <small class="form-text text-muted">
+              Only witnesses whose document ID falls in these ranges are
+              imported. Leave empty for the default (all Greek manuscripts on
+              a New Testament project; everything on other projects).
+            </small>
+          </div>
+          <div class="form-check">
+            <input
+              id="cbgm-firsthand"
+              v-model="start_options.firsthand_only"
+              class="form-check-input"
+              type="checkbox"
+            />
+            <label class="form-check-label" for="cbgm-firsthand">
+              First hand only
+              <small class="text-muted">
+                &mdash; uncheck to also import correctors (C, C1, &hellip;) as
+                separate witnesses
+              </small>
+            </label>
+          </div>
+          <div class="form-check">
+            <input
+              id="cbgm-supplements"
+              v-model="start_options.exclude_supplements"
+              class="form-check-input"
+              type="checkbox"
+            />
+            <label class="form-check-label" for="cbgm-supplements">
+              Exclude supplements
+              <small class="text-muted">
+                &mdash; skip supplement leaves instead of importing them as
+                separate &lsquo;s&rsquo; witnesses
+              </small>
+            </label>
+          </div>
+          <div class="cbgm-suffixes">
+            <label class="mb-0">
+              Collapse suffixed witnesses into their reading:
+            </label>
+            <small class="form-text text-muted" style="margin-top: 0">
+              An unchecked suffix excludes those witnesses at that variant
+              unit, as if lacunose.
+            </small>
+            <div class="form-check form-check-inline">
+              <input
+                id="cbgm-suffix-r"
+                v-model="start_options.collapse_regularized"
+                class="form-check-input"
+                type="checkbox"
+              />
+              <label class="form-check-label" for="cbgm-suffix-r">
+                r <small class="text-muted">(regularized)</small>
+              </label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input
+                id="cbgm-suffix-f"
+                v-model="start_options.collapse_nonsense"
+                class="form-check-input"
+                type="checkbox"
+              />
+              <label class="form-check-label" for="cbgm-suffix-f">
+                f <small class="text-muted">(Fehler)</small>
+              </label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input
+                id="cbgm-suffix-v"
+                v-model="start_options.collapse_unsure"
+                class="form-check-input"
+                type="checkbox"
+              />
+              <label class="form-check-label" for="cbgm-suffix-v">
+                V <small class="text-muted">(ut videtur)</small>
+              </label>
+            </div>
+          </div>
+          <div class="text-right" style="margin-top: 1rem">
+            <button
+              class="btn btn-sm btn-secondary"
+              @click="start_dialog = null"
+            >
+              Cancel
+            </button>
+            <button
+              class="btn btn-sm btn-primary"
+              style="margin-left: 6px"
+              @click="confirm_start"
+            >
+              Start import
+            </button>
+          </div>
+        </div>
+      </div>
       <p v-if="local_dump_enabled">
         <button
           class="btn btn-outline-primary btn-sm"
@@ -125,7 +240,7 @@
                 <button
                   v-else
                   class="btn btn-sm btn-primary"
-                  @click="startCbgm(p)"
+                  @click="open_start_dialog(p)"
                 >
                   Start CBGM
                 </button>
@@ -310,6 +425,21 @@ import ECMActs from "../images/ECMActs.jpg";
 import Docker from "../images/docker.png";
 import { login_url } from "../js/connections";
 
+// The user-configurable import options (mirrors the importer's
+// DEFAULT_OPTIONS in ntvmrimport.py); the defaults reproduce the classic
+// hard-wired behaviour.  Persisted server-side into the instance .conf and
+// echoed back on projects.json (import_options) so a Reload pre-fills them.
+function default_start_options() {
+  return {
+    doc_ranges: "",
+    firsthand_only: true,
+    collapse_regularized: true,
+    collapse_nonsense: true,
+    collapse_unsure: true,
+    exclude_supplements: false
+  };
+}
+
 export default {
   data: function() {
     return {
@@ -318,7 +448,9 @@ export default {
       projects: [],
       projects_loaded: false,
       offline: false,
-      menu_open: null
+      menu_open: null,
+      start_dialog: null, // project whose import-options dialog is open
+      start_options: default_start_options()
     };
   },
   computed: {
@@ -527,9 +659,29 @@ export default {
           });
         });
     },
-    reload_ntvmr: function(p) {
+    // Both Start CBGM and Reload go through the import-options dialog; a
+    // reload pre-fills the options the project was originally imported with
+    // (echoed back on projects.json from the instance .conf).
+    open_start_dialog: function(p) {
       this.menu_open = null;
-      this.startCbgm(p); // re-runs the NTVMR import
+      const opts = default_start_options();
+      if (p.import_options) {
+        try {
+          Object.assign(opts, JSON.parse(p.import_options));
+        } catch (e) {
+          // unreadable blob: fall back to the defaults
+        }
+      }
+      this.start_options = opts;
+      this.start_dialog = p;
+    },
+    confirm_start: function() {
+      const p = this.start_dialog;
+      this.start_dialog = null;
+      if (p) this.startCbgm(p, this.start_options);
+    },
+    reload_ntvmr: function(p) {
+      this.open_start_dialog(p); // re-runs the NTVMR import
     },
     refresh_all: function(p) {
       const vm = this;
@@ -599,14 +751,18 @@ export default {
       if (!p.import || !p.import.total) return 0;
       return Math.round((100 * p.import.done) / p.import.total);
     },
-    startCbgm: function(p) {
+    startCbgm: function(p, options) {
       const vm = this;
+      const opts = options || default_start_options();
       const data = new URLSearchParams();
       data.append("object_part", p.object_part);
       data.append("name", p.name);
       data.append("task_type_id", p.task_type_id || "");
       data.append("user_group", p.user_group || "");
       data.append("user_group_id", p.user_group_id || "");
+      for (const [key, val] of Object.entries(opts)) {
+        data.append(key, typeof val === "boolean" ? String(val) : val || "");
+      }
       vm.$set(p, "import", {
         state: "provisioning",
         message: "queued",
@@ -760,6 +916,38 @@ div.vm-project-list {
       & + a {
         border-top: 1px solid #eee;
       }
+    }
+  }
+
+  .cbgm-start-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cbgm-start-dialog {
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    padding: 1.25rem 1.5rem;
+    width: 480px;
+    max-width: 92vw;
+    max-height: 90vh;
+    overflow-y: auto;
+
+    .form-group,
+    .form-check {
+      margin-bottom: 0.5rem;
+    }
+    .cbgm-suffixes {
+      margin-top: 0.75rem;
     }
   }
 

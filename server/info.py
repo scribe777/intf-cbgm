@@ -124,6 +124,9 @@ def projects_json():
                         'user_group_id': ug.getAttribute('userGroupID'),
                         'instance_root': local.get('instance_root'),
                         'import': local.get('import') or get_status(remote_pid),
+                        # The options the mounted instance was imported with,
+                        # so the Start dialog pre-fills them on a Reload.
+                        'import_options': local.get('import_options') or '',
                         'connection_id': active_id,
                         'connection_label': active.get('label'),
                     }
@@ -193,6 +196,9 @@ def _projects_from_instances():
             'user_group_id': c.get('VMRCRE_USER_GROUP_ID', ''),
             'instance_root': root_path.rstrip('/') + '/' if root_path else None,
             'import': get_status(pid),
+            # JSON blob of the user's Start-dialog choices (see
+            # ntvmrimport.DEFAULT_OPTIONS); '' = imported with defaults.
+            'import_options': c.get('CBGM_IMPORT_OPTIONS') or '',
             'connection_id': cid,
             'connection_label': label,
             'local': bool(is_local),

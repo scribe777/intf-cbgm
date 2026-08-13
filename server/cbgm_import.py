@@ -13,6 +13,7 @@ The import runs in a background thread; the client polls /import_status.json
 for progress.  See vmrcre/README.md.
 """
 
+import json
 import logging
 import os
 import re
@@ -341,6 +342,46 @@ def _meta_from_request():
     }
 
 
+def _import_options_from_request():
+    """The user-chosen import options posted by the Start CBGM dialog (docID
+    ranges, firsthand-only, suffix collapsing, supplements), normalised against
+    the importer's defaults and returned as a JSON string.  The blob is
+    persisted into the instance .conf (CBGM_IMPORT_OPTIONS) so a Reload reuses
+    the same choices and the dialog can pre-fill them.  Raises ValueError on a
+    malformed docID range spec so the request fails up front, before any
+    database work."""
+
+    ni = _importer_module()
+    opts = dict(ni.DEFAULT_OPTIONS)
+    for key, default in ni.DEFAULT_OPTIONS.items():
+        if key not in request.values:
+            continue
+        raw = request.values.get(key)
+        if isinstance(default, bool):
+            opts[key] = str(raw).strip().lower() in ('1', 'true', 'yes', 'on')
+        else:
+            opts[key] = str(raw or '').strip()
+    ni.parse_doc_ranges(opts['doc_ranges'])     # validate; raises ValueError
+    return json.dumps(opts, sort_keys=True)
+
+
+def _stored_import_options(cfg, dbname):
+    """The CBGM_IMPORT_OPTIONS blob previously written into a project's
+    instance .conf ('' if none).  Carried forward by operations that rewrite
+    the conf without posting options (dump reloads), so a later Reload from the
+    backend keeps the user's original import choices."""
+
+    path = _conf_path_for(cfg, dbname)
+    if not os.path.isfile(path):
+        return ''
+    conf = flask.Config(os.path.dirname(path))
+    try:
+        conf.from_pyfile(path)
+    except Exception:  # pylint: disable=broad-except
+        return ''
+    return conf.get('CBGM_IMPORT_OPTIONS') or ''
+
+
 def _capture_import_identity(name):
     """Identity + project-relevant roles of the user performing the import.
 
@@ -389,7 +430,8 @@ def _import_meta(name):
 def _write_instance_conf(cfg, pid, name, dbname, object_part,
                          task_type_id='', user_group='', user_group_id='',
                          import_user_id='', import_user_name='',
-                         import_roles='', connection_id='', connection_api_url=''):
+                         import_roles='', connection_id='', connection_api_url='',
+                         import_options=''):
     """Write an instance .conf so the tool can serve the imported project."""
 
     # Write to the persistable projects dir (kept separate from the baked
@@ -427,6 +469,10 @@ def _write_instance_conf(cfg, pid, name, dbname, object_part,
         'VMRCRE_IMPORT_USER_ID="%(iuid)s"\n'
         'VMRCRE_IMPORT_USER_NAME="%(iuname)s"\n'
         'VMRCRE_IMPORT_ROLES="%(iroles)s"\n'
+        # The user-chosen import options (JSON; see ntvmrimport.DEFAULT_OPTIONS)
+        # this project was imported with, so a Reload reuses the same choices
+        # and the Start dialog can pre-fill them.  Empty = defaults.
+        'CBGM_IMPORT_OPTIONS="%(iopts)s"\n'
         # The VMRCRE backend this project was imported from.  The instance app
         # stays bound to it (its api_url) regardless of the active "Connect
         # to..." selection, so saves go to the right backend.  See
@@ -446,6 +492,7 @@ def _write_instance_conf(cfg, pid, name, dbname, object_part,
         'ugid': user_group_id,
         'iuid': import_user_id, 'iuname': _conf_quote(import_user_name),
         'iroles': _conf_quote(import_roles),
+        'iopts': _conf_quote(import_options),
         'connblock': _connection_conf_block(connection_id, connection_api_url),
     }
     with open(path, 'w') as fp:
@@ -526,7 +573,11 @@ def _worker(app, pid, object_part, name, meta=None):
             api = ((meta or {}).get('connection_api_url')
                    or cfg.get('VMRCRE_API_URL', ni.DEFAULT_API_URL))
             delay = float(cfg.get('CBGM_IMPORT_DELAY', 0.5))
-            importer = ni.Importer(conn, api, '-1', delay=delay)
+            # The user's Start-dialog choices (validated in the request
+            # handler); '' or absent = the importer's defaults.
+            options = json.loads((meta or {}).get('import_options') or '{}')
+            importer = ni.Importer(conn, api, '-1', delay=delay,
+                                   options=options)
 
             def progress(done, total, message):
                 _set(pid, state='importing', done=done, total=total,
@@ -704,12 +755,17 @@ def load_dump(pid):
     os.close(fd)
     f.save(tmp)
 
+    meta = _import_meta(name)
+    # A dump load posts no import options; keep the ones the project was
+    # originally imported with so a later "Reload from NTVMR" reuses them.
+    meta['import_options'] = _stored_import_options(
+        current_app.config, db_name_for(local_pid))
     _set(local_pid, state='provisioning', done=0, total=0, name=name,
          message='uploaded')
     t = threading.Thread(
         target=_worker_dump,
         args=(current_app._get_current_object(), local_pid, name, tmp,
-              object_part, _import_meta(name)),
+              object_part, meta),
         daemon=True)
     t.start()
     return make_json_response({'started': True, 'pid': local_pid,
@@ -765,6 +821,10 @@ def start(pid):
     if not object_part:
         return make_json_response({'started': False,
                                    'error': 'object_part required'})
+    try:
+        import_options = _import_options_from_request()
+    except ValueError as e:
+        return make_json_response({'started': False, 'error': str(e)})
 
     # Fresh import from a backend mints a local identity; a reload of an existing
     # local project reuses its id.  The import keys on `name`, so the returned
@@ -777,12 +837,14 @@ def start(pid):
             return make_json_response({'started': False, 'pid': local_pid,
                                        'status': st})
 
+    meta = _import_meta(name)
+    meta['import_options'] = import_options
     _set(local_pid, state='provisioning', done=0, total=0, name=name,
          message='queued')
     t = threading.Thread(
         target=_worker,
         args=(current_app._get_current_object(), local_pid, object_part, name,
-              _import_meta(name)),
+              meta),
         daemon=True)
     t.start()
     return make_json_response({'started': True, 'pid': local_pid,

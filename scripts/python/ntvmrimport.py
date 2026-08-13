@@ -62,6 +62,64 @@ VMRCRE_TESTAMENT_NT = 2
 GREEK_MS_MIN = 10000
 GREEK_MS_MAX = 49999
 
+# Corrector hands (the witness `hand` attribute) get their own witness identity
+# when the import is configured to include them.  hsnr = docID*10 + slot; slot
+# 0 is the firsthand and slot 1 its supplement, so correctors start at 2.  The
+# mapping is fixed (not first-come) so re-importing a verse into an existing
+# database allocates the same hsnr for the same hand.
+CORRECTOR_SLOTS = {'C': 2, 'C1': 3, 'C2': 4, 'C3': 5, 'C4': 6, 'C5': 7}
+
+# User-configurable import options (the Start CBGM dialog / the CLI flags
+# below).  The defaults reproduce the historical hard-wired behaviour, so an
+# options-less import is unchanged.
+DEFAULT_OPTIONS = {
+    # docID ranges to import, e.g. '10000-29999,30035'.  '' = the default rule:
+    # all Greek manuscripts on an NT project, everything on an OT project.
+    'doc_ranges': '',
+    # Only the original scribe attests; unset, each corrector hand becomes a
+    # separate witness at its CORRECTOR_SLOTS hsnr.
+    'firsthand_only': True,
+    # Whether a witness carrying the given siglum suffix still attests its
+    # parent reading (collapsed, the classic treatment).  Unset, the witness is
+    # excluded at that variation unit -- it contributes nothing genealogically
+    # there, as if lacunose.
+    'collapse_regularized': True,   # r
+    'collapse_nonsense': True,      # f (Fehler)
+    'collapse_unsure': True,        # V (ut videtur)
+    # Skip supplement leaves entirely instead of importing them as 'Xs'.
+    'exclude_supplements': False,
+}
+
+
+def parse_doc_ranges(spec):
+    """Parse a docID range spec ('10000-29999, 30035') into [(lo, hi), ...].
+
+    Returns None for an empty spec (= use the default per-testament rule).
+    Raises ValueError on malformed input so a bad dialog entry fails up front
+    instead of silently importing nothing.
+    """
+
+    spec = (spec or '').strip()
+    if not spec:
+        return None
+    ranges = []
+    for part in spec.split(','):
+        part = part.strip()
+        if not part:
+            continue
+        m = re.match(r'^(\d+)\s*-\s*(\d+)$|^(\d+)$', part)
+        if not m:
+            raise ValueError("bad docID range %r (use e.g. '10000-29999,30035')"
+                             % part)
+        if m.group(3):
+            lo = hi = int(m.group(3))
+        else:
+            lo, hi = int(m.group(1)), int(m.group(2))
+        if lo > hi:
+            raise ValueError('bad docID range %r (start > end)' % part)
+        ranges.append((lo, hi))
+    return ranges or None
+
 
 # --------------------------------------------------------------------------- #
 # NTVMR API
@@ -207,11 +265,18 @@ def context_word_range(context_description):
 class Importer:
     """Writes apparatus data for one project into a CBGM database."""
 
-    def __init__(self, conn, api_url, segment_group_id, delay=0.5):
+    def __init__(self, conn, api_url, segment_group_id, delay=0.5, options=None):
         self.conn = conn
         self.api_url = api_url
         self.segment_group_id = segment_group_id
         self.delay = delay      # polite pause between verses (avoid fail2ban)
+        # User-chosen import options (see DEFAULT_OPTIONS); unknown keys are
+        # ignored so an old .conf blob survives an option being retired.
+        self.options = dict(DEFAULT_OPTIONS)
+        self.options.update({k: v for k, v in (options or {}).items()
+                             if k in DEFAULT_OPTIONS})
+        self.doc_ranges = parse_doc_ranges(self.options['doc_ranges'])
+        self._skipped_hands = set()
         self._books_seen = set()
         # The edition base text docID ('Edition Basetext Default'); set in
         # import_project from the project config.  Drives the apparatus
@@ -779,26 +844,64 @@ class Importer:
                     seen_labez.add(labez)
 
                 for witness in reading.iter('witness'):
-                    # CBGM eligibility: only the original scribe (firsthand).
-                    # Correctors (hand C/C1/...) collapse to the same hsnr and
-                    # would violate one-reading-per-ms-per-passage.
-                    if witness.get('hand'):
-                        continue
+                    opts = self.options
+                    hand = witness.get('hand') or ''
+                    slot = 0
+                    if hand:
+                        # Only the original scribe by default (classic CBGM);
+                        # when correctors are included, each hand becomes its
+                        # own witness at a deterministic hsnr slot.
+                        if opts['firsthand_only']:
+                            continue
+                        slot = CORRECTOR_SLOTS.get(hand)
+                        if slot is None:
+                            if hand not in self._skipped_hands:
+                                self._skipped_hands.add(hand)
+                                log.warning("no hsnr slot for hand %r; "
+                                            "skipping that hand", hand)
+                            continue
                     try:
                         doc_id = int(witness.get('docID'))
                     except (TypeError, ValueError):
                         continue
-                    # NT projects cite Greek manuscripts only (10000-49999);
-                    # versions, fathers and editions are excluded.  OT /
-                    # versional projects (e.g. the Coptic-Sahidic OT on CoptOT)
-                    # use their own docID scheme, so the Greek-only range is not
-                    # applied there -- a project is wholly OT or wholly NT.
-                    if (testament == VMRCRE_TESTAMENT_NT
+                    if self.doc_ranges is not None:
+                        # User-chosen docID ranges override the default rule.
+                        if not any(lo <= doc_id <= hi
+                                   for lo, hi in self.doc_ranges):
+                            continue
+                    # Default rule: NT projects cite Greek manuscripts only
+                    # (10000-49999); versions, fathers and editions are
+                    # excluded.  OT / versional projects (e.g. the
+                    # Coptic-Sahidic OT on CoptOT) use their own docID scheme,
+                    # so the Greek-only range is not applied there -- a project
+                    # is wholly OT or wholly NT.
+                    elif (testament == VMRCRE_TESTAMENT_NT
                             and not (GREEK_MS_MIN <= doc_id <= GREEK_MS_MAX)):
+                        continue
+                    supplement = witness.get('supplement') == 'true'
+                    if supplement and opts['exclude_supplements']:
+                        continue
+                    # Suffixed witnesses (r / f / V) either collapse into their
+                    # parent reading (default) or are excluded at this
+                    # variation unit.
+                    if (witness.get('regularized') == 'true'
+                            and not opts['collapse_regularized']):
+                        continue
+                    if (witness.get('nonsense') == 'true'
+                            and not opts['collapse_nonsense']):
+                        continue
+                    if (witness.get('unsure') == 'true'
+                            and not opts['collapse_unsure']):
                         continue
                     hsnr = doc_id * 10
                     hs = witness.get('primaryName') or str(doc_id)
-                    if witness.get('supplement') == 'true':
+                    if hand:
+                        # A corrector keeps its slot whether or not it wrote on
+                        # a supplement leaf: the hand, not the leaf, is its
+                        # identity.
+                        hsnr += slot
+                        hs += hand
+                    elif supplement:
                         hsnr += 1
                         hs += 's'
                     self.ensure_manuscript(hsnr, hs)
@@ -903,6 +1006,20 @@ def build_parser():
                    help="apparatus segmentGroupID (default -1 = all/auto)")
     p.add_argument('--delay', type=float, default=0.5,
                    help="seconds to pause between verses (avoid rate-limit/fail2ban)")
+    p.add_argument('--doc-id-ranges', default='',
+                   help="only import witnesses in these docID ranges, e.g. "
+                        "'10000-29999,30035' (default: all Greek manuscripts "
+                        "on an NT project)")
+    p.add_argument('--include-correctors', action='store_true',
+                   help="import corrector hands (C, C1, ...) as separate "
+                        "witnesses (default: firsthand only)")
+    p.add_argument('--exclude-supplements', action='store_true',
+                   help="skip supplement leaves instead of importing them as "
+                        "separate 'Xs' witnesses")
+    p.add_argument('--exclude-suffixed', default='',
+                   help="comma list of siglum suffixes whose witnesses are "
+                        "EXCLUDED at that variation unit instead of collapsed "
+                        "into their parent reading; any of: r,f,V")
     p.add_argument('--dbname', default=os.environ.get('PGDATABASE'))
     p.add_argument('--host', default=os.environ.get('PGHOST', '127.0.0.1'))
     p.add_argument('--port', default=os.environ.get('PGPORT', '5432'))
@@ -920,11 +1037,31 @@ def main():
     if not args.dbname:
         sys.exit("error: target database not set (--dbname or PGDATABASE)")
 
+    suffixed = {s.strip().lower() for s in args.exclude_suffixed.split(',')
+                if s.strip()}
+    bad = suffixed - {'r', 'f', 'v'}
+    if bad:
+        sys.exit("error: unknown suffix(es) in --exclude-suffixed: %s"
+                 % ', '.join(sorted(bad)))
+    options = {
+        'doc_ranges': args.doc_id_ranges,
+        'firsthand_only': not args.include_correctors,
+        'collapse_regularized': 'r' not in suffixed,
+        'collapse_nonsense': 'f' not in suffixed,
+        'collapse_unsure': 'v' not in suffixed,
+        'exclude_supplements': args.exclude_supplements,
+    }
+    try:
+        parse_doc_ranges(options['doc_ranges'])
+    except ValueError as e:
+        sys.exit('error: %s' % e)
+
     conn = psycopg2.connect(
         host=args.host, port=args.port, user=args.user,
         password=args.password, dbname=args.dbname)
     try:
-        Importer(conn, args.api_url, args.segment_group_id, args.delay).import_project(
+        Importer(conn, args.api_url, args.segment_group_id, args.delay,
+                 options=options).import_project(
             args.object_part, args.project_name)
     finally:
         conn.close()
