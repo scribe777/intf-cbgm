@@ -1,0 +1,27 @@
+# AI overlay — enable the in-container local-stemma JVM co-process.
+#
+#   docker compose -f docker-compose.crosswire.yml -f docker-compose.ai.yml up
+#   (composes onto the localonly stack the same way)
+#
+# Bring-your-own-key: the engine API keys are read from YOUR host environment
+# (or a .env file beside this compose file) and passed through to the container.
+# They are NEVER baked into the image. Set only the engine(s) you use.
+#
+#   export ANTHROPIC_API_KEY=sk-ant-...
+#   export GEMINI_API_KEY=...
+#
+# The service then exposes GET/POST /localstemma/<passage> from the CBGM app.
+services:
+  cbgm-app-server:
+    environment:
+      AI_LOCALSTEMMA_ENABLED: "true"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      # Optional: default engine when the request doesn't name one (else "claude").
+      AI_DEFAULT_ENGINE: "${AI_DEFAULT_ENGINE:-gemini}"
+      # Optional: per-engine model for the local-stemma task (same names as
+      # sysconfig.properties). Omit to use each engine's built-in default model.
+      CLAUDE_CBGM_LOCAL_STEMMA_DEFAULT_MODEL: "${CLAUDE_CBGM_LOCAL_STEMMA_DEFAULT_MODEL:-}"
+      GEMINI_CBGM_LOCAL_STEMMA_DEFAULT_MODEL: "${GEMINI_CBGM_LOCAL_STEMMA_DEFAULT_MODEL:-}"
+      OPENAI_CBGM_LOCAL_STEMMA_DEFAULT_MODEL: "${OPENAI_CBGM_LOCAL_STEMMA_DEFAULT_MODEL:-}"

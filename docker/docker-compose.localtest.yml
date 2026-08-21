@@ -1,0 +1,33 @@
+# Local TEST stack: runs the LOCALLY BUILT images (intf/ntg-*) from this branch
+# so we exercise this branch's code (local-dump workbench, connections, etc.).
+#   docker compose -f docker-compose.localtest.yml up
+#   -> browse http://localhost:8088
+
+services:
+  # Service name must stay "ntg-db-server" (the app's PGHOST / .pgpass key).
+  ntg-db-server:
+    image: localhost/intf/ntg-db-server:latest
+    restart: unless-stopped
+    volumes:
+      - pgdata_test:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: topsecret
+
+  cbgm-app-server:
+    image: localhost/intf/ntg-app-server:latest
+    restart: unless-stopped
+    ports:
+      - "8088:5000"
+    environment:
+      CBGM_PUBLIC_URL: "http://localhost:8088"
+      VMRCRE_API_URL: "https://ntvmr.uni-muenster.de/community/vmr/api/"
+      CBGM_SCHEMA_TEMPLATE_DB: "cbgm_template"
+      # CBGM_ALLOW_LOCAL_DUMP defaults to !CBGM_LOCAL_ONLY (= true here).
+    volumes:
+      - projects_test:/home/ntg/projects
+    depends_on:
+      - ntg-db-server
+
+volumes:
+  pgdata_test:
+  projects_test:

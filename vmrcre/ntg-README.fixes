@@ -1,0 +1,24 @@
+
+PostgreSQL setup:
+after install: /usr/pgsql-10/bin/postgresql-10-setup initdb
+To fixe this error:
+psql: FATAL:  Ident authentication failed for user "ntg"
+edit: /data/var/lib/pgsql/10/data/pg_hba.conf: change 'ident' to md5 and restart postgresql
+local   all             all                                     md5
+host    all             all             127.0.0.1/32            md5
+host    all             all             ::1/128                 md5
+
+install doc:
+- python3 -m scripts.cceh.mk_user -e <email> -u <username> -p <password>
++ python3 -m scripts.cceh.mk_users -e <email> -u <username> -p <password> server/instance/_globals.conf
+
+~/.my.cnf: add .ntg to file name
+	remove ' from file
+	change [ntg] to [mysql]
+
+server/instance/<app>.conf: add MYSQL_NESTLE_TABLE='Nestle29'
+
+run prepare.py before cbgm.py
+
+after cd client, then make build, and then copy build contents to webserver doc location
+and edit api.conf.js to point to api server

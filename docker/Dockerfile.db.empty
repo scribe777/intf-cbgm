@@ -1,0 +1,7 @@
+# Data-less CBGM database image: ships the empty CBGM schema as a template
+# (cbgm_template) that "Start CBGM" clones per project.  No project apparatus
+# data is bundled -- users log in via the NTVMR, pick a project, and import.
+FROM postgres:12
+
+COPY ./backup/cbgm_template.dump            /backup/
+COPY ./docker-entrypoint-initdb.d-empty/    /docker-entrypoint-initdb.d/

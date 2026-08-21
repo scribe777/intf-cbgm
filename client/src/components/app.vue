@@ -196,6 +196,12 @@ const store = new Vuex.Store({
     api_url: "",
     instances: [],
     ranges: [],
+    // Selectable VMRCRE backends ("Connect to..." menu) and the active one's id.
+    // See vmrcre/CONNECTIONS.md.
+    connections: [],
+    active_connection_id: null,
+    // Whether to offer "Load a CBGM dump (work locally)".  See CONNECTIONS.md.
+    local_dump_enabled: false,
     current_application: {
       ...default_application
     },
@@ -207,6 +213,11 @@ const store = new Vuex.Store({
   mutations: {
     instances(state, data) {
       state.instances = data;
+    },
+    connections(state, data) {
+      state.connections = (data && data.connections) || [];
+      state.active_connection_id = (data && data.active) || null;
+      state.local_dump_enabled = !!(data && data.local_dump);
     },
     api_url(state, data) {
       state.api_url = data;
@@ -234,6 +245,11 @@ const store = new Vuex.Store({
   },
   getters: {
     api_url: (state) => state.api_url,
+    connections: (state) => state.connections,
+    active_connection: (state) =>
+      state.connections.find((c) => c.id === state.active_connection_id) ||
+      null,
+    local_dump_enabled: (state) => state.local_dump_enabled,
     route_meta: (state) => state.route_meta,
     ranges: (state) => state.ranges,
     current_application: (state) => state.current_application,
@@ -378,16 +394,127 @@ export default {
   computed: {
     ...mapGetters(["api_url"])
   },
-  created() {
+  methods: {
+    // (Re)load instances + current user into the store.  Resolves true if a
+    // (non-anonymous) NTVMR user is logged in.
+    refresh_session() {
+      const vm = this;
+      return Promise.all([
+        axios.get(url.resolve(vm.api_base_url, "info.json")),
+        axios.get(url.resolve(vm.api_base_url, "user.json"))
+      ])
+        .then((responses) => {
+          vm.$store.commit("instances", responses[0].data.data.instances);
+          vm.$store.commit("current_user", responses[1].data.data);
+          return responses[1].data.data.username !== "anonymous";
+        })
+        .catch(() => {
+          // The local /api/ endpoints failed (server hiccup); keep whatever
+          // session state we have rather than throwing an unhandled rejection.
+          return false;
+        });
+    },
+    // Load the VMRCRE connection registry + active connection (a LOCAL endpoint,
+    // so it works offline too) and point window.vmrcre_api_url at the active
+    // backend for the SSO handshake.  No active connection => standalone (no
+    // SSO).  See vmrcre/CONNECTIONS.md.
+    load_connections() {
+      const vm = this;
+      return axios
+        .get(url.resolve(vm.api_base_url, "connections.json"))
+        .then((r) => {
+          const d = (r.data && r.data.data) || r.data || {};
+          vm.$store.commit("connections", d);
+          const active = vm.$store.getters.active_connection;
+          window.vmrcre_api_url = active ? active.api_url : "";
+        })
+        .catch(() => {
+          // Keep the api.conf.js fallback already in window.vmrcre_api_url.
+        });
+    }
+  },
+  async created() {
     const vm = this;
-    const requests = [
-      axios.get(url.resolve(vm.api_base_url, "info.json")),
-      axios.get(url.resolve(vm.api_base_url, "user.json"))
-    ];
-    Promise.all(requests).then((responses) => {
-      vm.$store.commit("instances", responses[0].data.data.instances);
-      vm.$store.commit("current_user", responses[1].data.data);
-    });
+    // NTVMR single sign-on: if we just returned from the NTVMR login redirect
+    // (auth/session/check?r=...), it appended ?vmrcreSession=<hash>.  Capture
+    // it into a cookie on this origin so the server's request_loader can use
+    // it, then drop it from the URL.  See vmrcre/README.md.
+    const params = new URLSearchParams(window.location.search);
+    const sess = params.get("vmrcreSession");
+    const returned_from_dance = sess !== null;
+    if (returned_from_dance) {
+      if (sess && sess !== "null") {
+        document.cookie =
+          "vmrcreSession=" + encodeURIComponent(sess) + "; path=/; SameSite=Lax";
+      }
+      params.delete("vmrcreSession");
+      const qs = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        window.location.pathname + (qs ? "?" + qs : "") + window.location.hash
+      );
+    }
+    // Resolve the active VMRCRE backend (sets window.vmrcre_api_url) BEFORE the
+    // SSO gate below, which keys off it.  No active connection => standalone.
+    await vm.load_connections();
+    // Automatic single sign-on.  If we have no session yet, bounce once through
+    // the NTVMR -- a *top-level* redirect, so the browser sends the NTVMR
+    // session cookie (a hidden iframe can't: it's third-party).  If the user is
+    // logged into the NTVMR we come back with ?vmrcreSession=<hash> and are
+    // logged in; if not, we come back with none and show "Log In".  A
+    // sessionStorage guard makes this happen at most once, so logged-out users
+    // don't loop.  See vmrcre/README.md.
+    const has_cookie = document.cookie.indexOf("vmrcreSession=") !== -1;
+    let tried = false;
+    try {
+      tried = window.sessionStorage.getItem("vmrcre_sso_tried") === "1";
+    } catch (e) {
+      tried = true; // no sessionStorage -> don't risk a loop
+    }
+    if (returned_from_dance) {
+      try {
+        window.sessionStorage.setItem("vmrcre_sso_tried", "1");
+      } catch (e) {
+        /* noop */
+      }
+    }
+    if (!has_cookie && !tried && !returned_from_dance && window.vmrcre_api_url) {
+      // Probe the NTVMR before doing a *top-level* SSO redirect.  A navigation
+      // hangs forever when offline (blank screen, stuck on the NTVMR URL); a
+      // fetch fails fast.  Only bounce if the NTVMR is actually reachable --
+      // otherwise stay in the app and run offline.  See vmrcre/README.md.
+      const ctrl = new AbortController();
+      const timer = window.setTimeout(function() {
+        ctrl.abort();
+      }, 2500);
+      window
+        .fetch(window.vmrcre_api_url + "auth/session/check/", {
+          mode: "no-cors",
+          signal: ctrl.signal
+        })
+        .then(function() {
+          window.clearTimeout(timer);
+          // NTVMR reachable -> do the one-time SSO bounce (top-level redirect).
+          try {
+            window.sessionStorage.setItem("vmrcre_sso_tried", "1");
+          } catch (e) {
+            /* noop */
+          }
+          const here = window.location.origin + window.location.pathname;
+          window.location.href =
+            window.vmrcre_api_url +
+            "auth/session/check/?r=" +
+            encodeURIComponent(here);
+        })
+        .catch(function() {
+          window.clearTimeout(timer);
+          // Offline / NTVMR unreachable -> don't navigate away; run offline.
+          vm.refresh_session();
+        });
+      return; // either bouncing (reachable) or refreshing offline (catch)
+    }
+    vm.refresh_session();
   },
   mounted() {
     // insert css for color palettes
@@ -435,9 +562,57 @@ window.addEventListener("hashchange", function() {
     src: url("../webfonts/metawebpro-bold.woff"); 
   }
 
-@font-face { 
+@font-face {
   font-family: "WWUSymbol";
-  src: url("../webfonts/wwu_symbol.woff"); 
+  src: url("../webfonts/wwu_symbol.woff");
+}
+
+/* Biblical-text webfonts, bundled so the tool renders every versional script a
+   VMRCRE project may contain -- on any backend, offline too.  Ported from the
+   VMRCRE transcript editor's content-extra.css (the /community/fonts set) plus
+   GentiumPlus for Greek/Latin.  Each font covers one script; per-glyph fallback
+   in the stack below renders each character from the first font that has it. */
+@font-face {           /* Greek / Latin */
+  font-family: "GentiumPlus";
+  src: url("../webfonts/GentiumPlus-R.woff") format("woff");
+}
+@font-face {
+  font-family: "GentiumPlus";
+  font-style: italic;
+  src: url("../webfonts/GentiumPlus-I.woff") format("woff");
+}
+@font-face {           /* Coptic (incl. nomina-sacra combining overlines) */
+  font-family: "AntinoouWeb";
+  src: url("../webfonts/antinoou-webfont.woff") format("woff");
+}
+@font-face {           /* Syriac (Estrangelo) */
+  font-family: "EstreWeb";
+  src: url("../webfonts/estre.woff") format("woff");
+}
+@font-face {           /* Old Church Slavonic / Glagolitic */
+  font-family: "BukyvedeWeb";
+  src: url("../webfonts/Bukyvede.woff") format("woff");
+}
+@font-face {           /* Hebrew */
+  font-family: "SBL_HebrewWeb";
+  src: url("../webfonts/sbl_hbrw-webfont.woff2") format("woff2"),
+       url("../webfonts/sbl_hbrw-webfont.woff") format("woff");
+}
+@font-face {           /* Arabic */
+  font-family: "ArabicWeb";
+  src: url("../webfonts/NotoNaskhArabic-Regular.woff2") format("woff2"),
+       url("../webfonts/NotoNaskhArabic-Regular.woff") format("woff");
+  font-display: swap;
+}
+
+/* Apply the multilingual stack to the elements that carry biblical text: the
+   Leitzeile lemmas, the apparatus reading lesart, and the comparison table's
+   lesart cells.  Witness sigla and labez letters stay in the UI font. */
+.vm-leitzeile,
+.apparatus-labez,
+.lesart {
+  font-family: "GentiumPlus", "AntinoouWeb", "EstreWeb", "SBL_HebrewWeb",
+    "ArabicWeb", "BukyvedeWeb", "Arial Unicode MS", serif;
 }
 
 a {

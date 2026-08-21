@@ -28,12 +28,56 @@
             >{{ link.desc }}</b-dropdown-item
           >
         </b-nav-item-dropdown>
-        <b-nav-item v-if="this.is_logged_in === false" style="position: absolute; right:0;" href="/user/sign-in"
-          >Log In</b-nav-item
+        <!-- Classic local-only deployment (no VMRCRE backends): local accounts
+             in the instance DB; sign in/out via flask_user, exactly as before
+             the VMRCRE integration.  See vmrcre/CONNECTIONS.md. -->
+        <template v-if="connections.length === 0">
+          <b-nav-item v-if="is_logged_in === false" style="position: absolute; right:0;" href="/user/sign-in"
+            >Log In</b-nav-item
+          >
+          <b-nav-item v-else style="position: absolute; right:0;" href="/user/sign-out"
+            >{{ current_user.username }} (Log Out)</b-nav-item
+          >
+        </template>
+
+        <!-- Multiple VMRCRE backends: a "Connect to..." menu to switch between
+             them.  See vmrcre/CONNECTIONS.md. -->
+        <b-nav-item-dropdown
+          v-else-if="connections.length > 1"
+          :text="connect_label"
+          right
+          style="position: absolute; right:0;"
+          class="connect-menu"
         >
-        <b-nav-item v-if="this.is_logged_in === true" style="position: absolute; right:0;" href="/user/sign-out"
-          >Log Out</b-nav-item
-        >
+          <b-dropdown-header>Connect to</b-dropdown-header>
+          <b-dropdown-item
+            v-for="conn of connections"
+            :key="conn.id"
+            @click="connect_to(conn)"
+            >{{ is_active(conn) ? "✓ " : "" }}{{ conn.label }}</b-dropdown-item
+          >
+          <b-dropdown-divider />
+          <b-dropdown-item
+            v-if="is_logged_in"
+            :href="vmrcre_site_url"
+            target="_blank"
+            rel="noopener"
+            >{{ current_user.username }} — open ↗</b-dropdown-item
+          >
+          <b-dropdown-item v-else-if="active_connection" :href="vmrcre_login_url"
+            >Log in to {{ active_connection.label }}</b-dropdown-item
+          >
+        </b-nav-item-dropdown>
+
+        <!-- Single backend: the original Log In / username item. -->
+        <template v-else>
+          <b-nav-item v-if="is_logged_in === false" style="position: absolute; right:0;" :href="vmrcre_login_url"
+            >Log In</b-nav-item
+          >
+          <b-nav-item v-if="is_logged_in === true" style="position: absolute; right:0;" :href="vmrcre_site_url" target="_blank" rel="noopener"
+            >{{ current_user.username }}</b-nav-item
+          >
+        </template>
       </b-navbar-nav>
     </b-navbar>
   </div>
@@ -53,9 +97,12 @@ import { BNavbarNav } from "bootstrap-vue/src/components/navbar/navbar-nav";
 import { BNavItem } from "bootstrap-vue/src/components/nav/nav-item";
 import { BNavItemDropdown } from "bootstrap-vue/src/components/nav/nav-item-dropdown";
 import { BDropdownItem } from "bootstrap-vue/src/components/dropdown/dropdown-item";
+import { BDropdownHeader } from "bootstrap-vue/src/components/dropdown/dropdown-header";
+import { BDropdownDivider } from "bootstrap-vue/src/components/dropdown/dropdown-divider";
 
 import wwu_logo from "../images/wwu_logo.svg";
 import intf2021 from "../images/intf2021.jpeg";
+import { login_url, site_url } from "../js/connections";
 
 export default {
   components: {
@@ -63,7 +110,9 @@ export default {
     "b-navbar-nav": BNavbarNav,
     "b-nav-item": BNavItem,
     "b-nav-item-dropdown": BNavItemDropdown,
-    "b-dropdown-item": BDropdownItem
+    "b-dropdown-item": BDropdownItem,
+    "b-dropdown-header": BDropdownHeader,
+    "b-dropdown-divider": BDropdownDivider
   },
   data: function() {
     return {
@@ -77,8 +126,18 @@ export default {
       "is_logged_in",
       "current_application",
       "current_user",
+      "connections",
+      "active_connection",
       "route_meta"
     ]),
+    connect_label: function() {
+      const a = this.active_connection;
+      if (this.is_logged_in && a) {
+        return this.current_user.username + " @ " + a.label;
+      }
+      if (a) return a.label + " — Log In";
+      return "Connect to…";
+    },
     navlist: function() {
       // only add public projects to navbar
       let links = this.$store.state.instances.filter((obj) =>
@@ -117,6 +176,45 @@ export default {
         navlist.push(obj);
       }
       return navlist;
+    },
+    // The active backend's portal-login URL (shown when not logged in) and site
+    // root (the logged-in username links there; the session belongs to the
+    // VMRCRE, so there is no CBGM-local logout).  See js/connections.js.
+    vmrcre_login_url: function() {
+      return login_url(this.active_connection);
+    },
+    vmrcre_site_url: function() {
+      return site_url(this.active_connection);
+    }
+  },
+  methods: {
+    is_active: function(conn) {
+      return !!this.active_connection && conn.id === this.active_connection.id;
+    },
+    connect_to: function(conn) {
+      // Already connected and logged in here -> just open that VMRCRE.
+      if (this.is_active(conn) && this.is_logged_in) {
+        window.open(this.vmrcre_site_url, "_blank", "noopener");
+        return;
+      }
+      // Remember the chosen backend so the server resolves it after the bounce,
+      // and drop the previous backend's session so we re-auth against the new
+      // one.  See vmrcre/CONNECTIONS.md.
+      document.cookie =
+        "cbgmConnection=" + encodeURIComponent(conn.id) + "; path=/; SameSite=Lax";
+      document.cookie = "vmrcreSession=; path=/; Max-Age=0; SameSite=Lax";
+      try {
+        window.sessionStorage.removeItem("vmrcre_sso_tried");
+      } catch (e) {
+        /* noop */
+      }
+      // Top-level SSO bounce to the new backend (sets its cookie, returns
+      // ?vmrcreSession); if there is no session there we come back logged out
+      // and show "Log in to <backend>".
+      const here = window.location.origin + window.location.pathname;
+      const api = conn.api_url.replace(/\/?$/, "/");
+      window.location.href =
+        api + "auth/session/check/?r=" + encodeURIComponent(here);
     }
   }
 };

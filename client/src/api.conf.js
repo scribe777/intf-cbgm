@@ -1,1 +1,2 @@
-var api_base_url = "http://localhost:5000/api/";
+var api_base_url = "/api/";
+var vmrcre_api_url = "https://ntvmr.uni-muenster.de/community/vmr/api/";

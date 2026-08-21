@@ -18,6 +18,7 @@ To start the server go to the parent directory and say::
 import argparse
 import collections
 import glob
+import json
 import logging
 import os
 import os.path
@@ -38,18 +39,22 @@ from ntg_common.exceptions import EditException
 import login
 import main
 import info
+import cbgm_import
+import cbgm_backup
 import static
 import textflow
 import comparison
 import editor
 import set_cover
 import checks
+import cbgm_ai
 
 dba = flask_sqlalchemy.SQLAlchemy()
 user, _role, _roles_users = login.declare_user_model_on(dba)
 db_adapter = flask_user.SQLAlchemyAdapter(dba, user)
 login_manager = flask_login.LoginManager()
 login_manager.anonymous_user = login.AnonymousUserMixin
+login.register_request_loader(login_manager)  # NTVMR single sign-on; see vmrcre/README.md
 user_manager = flask_user.UserManager(db_adapter)
 mail = flask_mail.Mail()
 
@@ -74,6 +79,76 @@ class Config ():
     WRITE_ACCESS = 'none'
     CORS_ALLOW_ORIGIN = '*'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # allow large CBGM dump uploads
+    # NTVMR single sign-on (see vmrcre/README.md).  Override per instance.
+    # Overridable via environment (so the published image is configured from
+    # the compose file).  See vmrcre/README.md.
+    VMRCRE_API_URL = os.environ.get(
+        'VMRCRE_API_URL', 'https://ntvmr.uni-muenster.de/community/vmr/api/')
+    # Selectable VMRCRE backends for the "Connect to..." menu (see
+    # vmrcre/CONNECTIONS.md).  A list of {id, label, api_url, site_url}; override
+    # the whole list via the CBGM_CONNECTIONS env var (JSON).  A deployment with
+    # only the legacy VMRCRE_API_URL set (no list) synthesises a single 'ntvmr'
+    # connection from it, so existing single-backend installs are unchanged.
+    CBGM_CONNECTIONS = json.loads(os.environ['CBGM_CONNECTIONS']) if os.environ.get(
+        'CBGM_CONNECTIONS') else [
+        {'id': 'ntvmr', 'label': 'NTVMR',
+         'api_url': VMRCRE_API_URL,
+         'site_url': 'https://ntvmr.uni-muenster.de/'},
+        {'id': 'coptot', 'label': 'CoptOT',
+         'api_url': 'https://coptot.manuscriptroom.com/community/vmr/api/',
+         'site_url': 'https://coptot.manuscriptroom.com/'},
+    ]
+    # The connection that is active before the user picks one.  '' starts
+    # standalone (vanilla CBGM, no SSO) -- the toggle for an upstream build.
+    # Base ships 'ntvmr' so our hosted behaviour is unchanged.
+    CBGM_DEFAULT_CONNECTION = os.environ.get('CBGM_DEFAULT_CONNECTION', 'ntvmr')
+    # Classic "shared instance" mode (how the tool worked before the VMRCRE
+    # integration): advertise NO backends -- no SSO, no "Connect to..." menu;
+    # list only the locally loaded project DBs and authenticate against the
+    # instance's own user table via flask_user, with rights/roles from that DB.
+    # See vmrcre/CONNECTIONS.md.
+    CBGM_LOCAL_ONLY = os.environ.get(
+        'CBGM_LOCAL_ONLY', '').lower() in ('1', 'true', 'yes')
+    # Allow an (even anonymous) user to load their own CBGM dump file as a purely
+    # local project -- the "download the image, don't log in to any VMRCRE, work
+    # on my dump" workbench case.  Such projects carry no VMRCRE_PROJECT_ID /
+    # CONNECTION_ID, so editorial sync is permanently off for them.
+    # Default = NOT CBGM_LOCAL_ONLY: a locked-down preloaded shared instance
+    # never wants ad-hoc dumps, but every other deploy (incl. a connections-off
+    # standalone project image) does.  Set explicitly to override either way.
+    CBGM_ALLOW_LOCAL_DUMP = os.environ.get(
+        'CBGM_ALLOW_LOCAL_DUMP',
+        'false' if CBGM_LOCAL_ONLY else 'true').lower() in ('1', 'true', 'yes')
+    VMRCRE_SESSION_COOKIE = os.environ.get('VMRCRE_SESSION_COOKIE', 'vmrcreSession')
+    VMRCRE_ROLE_PREFIX = os.environ.get('VMRCRE_ROLE_PREFIX', 'CBGM ')
+    VMRCRE_PROJECT_NAME = None
+    # "Start CBGM" import.
+    CBGM_SCHEMA_TEMPLATE_DB = os.environ.get(
+        'CBGM_SCHEMA_TEMPLATE_DB', 'cbgm_template')  # data-less schema cloned from here
+    CBGM_IMPORT_DELAY = float(os.environ.get('CBGM_IMPORT_DELAY', '0.5'))
+    # Empty => any logged-in user may Start CBGM / load / reload (the laptop
+    # case; the project list already limits to the user's own projects).  Set
+    # to a role name (e.g. 'Editor') to restrict, for a shared/hosted instance.
+    CBGM_START_ROLE = os.environ.get('CBGM_START_ROLE', '')
+    # WRITE_ACCESS baked into each imported project's instance conf.  'public'
+    # lets a logged-in laptop user edit locally; set to a role for a shared
+    # instance.  (Sharing edits to the NTVMR is gated separately, below.)
+    CBGM_PROJECT_WRITE_ACCESS = os.environ.get('CBGM_PROJECT_WRITE_ACCESS', 'public')
+    # Per-project role required to SAVE editorial decisions to the NTVMR (where
+    # other editors see them).  Checked with auth/hasrole scoped to the project
+    # (a global role does NOT satisfy it).  Empty disables the gate.
+    # NTVMR project-scoped roles are 'Project '-prefixed by convention.
+    CBGM_SAVE_ROLE = os.environ.get('CBGM_SAVE_ROLE', 'Project CBGM Editor')
+    # Seconds to cache a live auth/session/check result per session cookie, so
+    # identity isn't re-resolved against the NTVMR on every request.  Role
+    # freshness is unaffected (roles are checked live at save time).  0 disables
+    # the cache (resolve every request).
+    VMRCRE_SESSION_CACHE_TTL = int(os.environ.get('VMRCRE_SESSION_CACHE_TTL', '300'))
+    # Where Start CBGM writes per-project instance confs.  Keep this OUT of the
+    # baked instance/ dir so it can be a persistent volume without hiding
+    # _global.conf.
+    CBGM_PROJECTS_DIR = os.environ.get('CBGM_PROJECTS_DIR', '/home/ntg/projects')
 
 
 def build_parser(default_config_file=Config.CONFIG_FILE):
@@ -128,8 +203,79 @@ def do_init_app(app):
     ))
 
 
+# Set by create_app so new instances can be built and mounted into the running
+# server at runtime (e.g. by the "Start CBGM" import).  See cbgm_import.py.
+_main_app = None
+_dispatcher = None
+_instance_path = None
+_global_config = None
+_user_db_url = None
+_config_class = None
+
+
+def build_instance_app(conf_path):
+    """Build a sub-application for one instance .conf file (full path)."""
+
+    sub_app = flask.Flask(__name__)
+    sub_app.config.from_object(_config_class)
+    sub_app.config.from_pyfile(_global_config)
+    sub_app.config.from_pyfile(conf_path)
+    sub_app.config['CONFIG_FILE'] = os.path.basename(conf_path)
+    sub_app.config['APPLICATION_DIR'] = sub_app.config['APPLICATION_ROOT']
+    sub_app.config['APPLICATION_ROOT'] = os.path.join(
+        _main_app.config['APPLICATION_ROOT'], sub_app.config['APPLICATION_ROOT']
+    )
+    for mod in (main, textflow, comparison, editor, set_cover, checks, cbgm_ai):
+        sub_app.register_blueprint(mod.bp)
+    sub_app.register_blueprint(cbgm_backup.bp)  # /editorial/* (no init_app)
+    sub_app.config.dba = db_tools.PostgreSQLEngine(**sub_app.config)
+    sub_app.config['SQLALCHEMY_DATABASE_URI'] = _user_db_url
+    do_init_app(sub_app)
+    for mod in (main, textflow, comparison, editor, set_cover, checks, cbgm_ai):
+        mod.init_app(sub_app)
+    return sub_app
+
+
+def mount_instance(conf_path):
+    """Build and mount an instance into the running server, no restart needed.
+
+    Called by the "Start CBGM" import once a project's database is ready, so
+    its "Open" link works immediately.
+    """
+
+    sub_app = build_instance_app(conf_path)
+    mount = sub_app.config['APPLICATION_ROOT']
+    if _dispatcher is not None:
+        _dispatcher.mounts[mount] = sub_app   # route requests to it
+    info.init_app(_main_app, {mount: sub_app})  # so info/projects.json see it
+    _main_app.logger.info("Live-mounted instance at %s from conf %s",
+                          mount, os.path.basename(conf_path))
+    return mount
+
+
+def _existing_databases(app):
+    """Set of database names on the server (to skip confs whose DB is absent)."""
+
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host=app.config['PGHOST'], port=app.config.get('PGPORT', 5432),
+            user=app.config['PGUSER'], dbname=app.config['PGDATABASE'],
+            sslmode='disable')
+        cur = conn.cursor()
+        cur.execute("SELECT datname FROM pg_database")
+        names = {r[0] for r in cur.fetchall()}
+        conn.close()
+        return names
+    except Exception:  # pylint: disable=broad-except
+        return None  # unknown -> don't skip anything
+
+
 def create_app(Config):
     """ App creation function """
+
+    global _main_app, _dispatcher, _instance_path, _global_config
+    global _user_db_url, _config_class
 
     instance_path = os.path.abspath('instance')
 
@@ -138,6 +284,12 @@ def create_app(Config):
     global_config = os.path.join(instance_path, Config.CONFIG_FILE)
     app.config.from_object(Config)
     app.config.from_pyfile(global_config)
+    app.config['INSTANCE_DIR'] = instance_path  # where Start CBGM writes confs
+
+    _config_class = Config
+    _main_app = app
+    _instance_path = instance_path
+    _global_config = global_config
 
     # pylint: disable=no-member
     app.logger.setLevel(Config.LOG_LEVEL)
@@ -148,6 +300,7 @@ def create_app(Config):
 
     app.config.dba = db_tools.PostgreSQLEngine(**app.config)
     user_db_url = app.config.dba.url
+    _user_db_url = user_db_url
     # tell flask_sqlalchemy where the user authentication database is
     app.config['SQLALCHEMY_DATABASE_URI'] = user_db_url
 
@@ -155,52 +308,46 @@ def create_app(Config):
     do_init_app(app)
 
     instances = collections.OrderedDict()
-    extra_files = [instance_path + '/' + Config.CONFIG_FILE]
+    extra_files = [global_config]
 
-    for fn in glob.glob(instance_path + '/*.conf'):
-        extra_files.append(fn)
-        fn = os.path.basename(fn)
-        if fn == Config.CONFIG_FILE:
+    existing_dbs = _existing_databases(app)
+
+    # Base instance confs (baked) plus per-project confs written by Start CBGM
+    # (in a separate, persistable dir).
+    projects_dir = app.config.get('CBGM_PROJECTS_DIR')
+    conf_paths = sorted(glob.glob(instance_path + '/*.conf'))
+    if projects_dir and os.path.isdir(projects_dir):
+        conf_paths += sorted(glob.glob(projects_dir + '/*.conf'))
+
+    for path in conf_paths:
+        if os.path.basename(path) == Config.CONFIG_FILE:
             continue
-
-        sub_app = flask.Flask(__name__)
-        sub_app.config.from_object(Config)
-        sub_app.config.from_pyfile(global_config)
-        sub_app.config.from_pyfile(os.path.join(instance_path, fn))
-        sub_app.config['CONFIG_FILE'] = fn
-        sub_app.config['APPLICATION_DIR'] = sub_app.config['APPLICATION_ROOT']
-        sub_app.config['APPLICATION_ROOT'] = os.path.join(
-            app.config['APPLICATION_ROOT'], sub_app.config['APPLICATION_ROOT']
-        )
-        sub_app.register_blueprint(main.bp)
-        sub_app.register_blueprint(textflow.bp)
-        sub_app.register_blueprint(comparison.bp)
-        sub_app.register_blueprint(editor.bp)
-        sub_app.register_blueprint(set_cover.bp)
-        sub_app.register_blueprint(checks.bp)
-
-        sub_app.config.dba = db_tools.PostgreSQLEngine(**sub_app.config)
-        sub_app.config['SQLALCHEMY_DATABASE_URI'] = user_db_url
-
-        do_init_app(sub_app)
-        main.init_app(sub_app)
-        textflow.init_app(sub_app)
-        comparison.init_app(sub_app)
-        editor.init_app(sub_app)
-        set_cover.init_app(sub_app)
-        checks.init_app(sub_app)
-
+        extra_files.append(path)
+        # Skip an instance whose database isn't present (e.g. the sample
+        # acts/mark confs in a data-less deployment) BEFORE building it --
+        # building eagerly connects, which would crash on a missing DB.
+        if existing_dbs is not None:
+            peek = flask.Config(instance_path)
+            peek.from_pyfile(global_config)
+            peek.from_pyfile(path)
+            if peek.get('PGDATABASE') not in existing_dbs:
+                app.logger.info("Skipping instance %s: database '%s' not found",
+                                os.path.basename(path), peek.get('PGDATABASE'))
+                continue
+        sub_app = build_instance_app(path)
         instances[sub_app.config['APPLICATION_ROOT']] = sub_app
 
     info_app = flask.Flask(__name__)
     info_app.config.update(app.config)
     info_app.register_blueprint(info.bp)
+    info_app.register_blueprint(cbgm_import.bp)
     do_init_app(info_app)
     info.init_app(app, instances)
 
     instances[app.config['APPLICATION_ROOT']] = info_app
 
     d = DispatcherMiddleware(app, instances)
+    _dispatcher = d
     d.config = app.config
     d.config['EXTRA_FILES'] = extra_files
     return d
@@ -219,6 +366,26 @@ if __name__ == "__main__":
     Config.LOG_LEVEL = args.log_level
     Config.CONFIG_FILE = args.config_file
     app = create_app(Config)
+
+    # werkzeug's startup banner prints the container's *internal* bind address
+    # (e.g. "Running on http://10.89.0.3:5000/"), which a user can't reach.
+    # In werkzeug 2.0.x that banner goes through the 'werkzeug' logger, so drop
+    # just those lines (request access-logs don't say "Running on") and print
+    # the real, host-facing URL ourselves instead.
+    class _DropWerkzeugBanner(logging.Filter):
+        def filter(self, record):  # noqa: A003
+            return 'Running on' not in record.getMessage()
+    logging.getLogger('werkzeug').addFilter(_DropWerkzeugBanner())
+
+    # CBGM_PUBLIC_URL is set by the published docker-compose to the host-mapped
+    # URL (e.g. http://localhost:8088).  Fall back to the container port for
+    # direct/dev runs.
+    public_url = os.environ.get('CBGM_PUBLIC_URL') \
+        or 'http://localhost:%s' % app.config['APPLICATION_PORT']
+    line = '*  Open  %s  in your browser.  *' % public_url
+    bar = '*' * len(line)
+    print('\n'.join(['', bar, '*%s*' % (' ' * (len(line) - 2)), line,
+                      '*%s*' % (' ' * (len(line) - 2)), bar, '']), flush=True)
 
     run_simple(
         app.config['APPLICATION_HOST'],
