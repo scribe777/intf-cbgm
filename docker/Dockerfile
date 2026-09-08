@@ -1,6 +1,11 @@
 FROM python:3.8-slim-bullseye
 
-RUN	apt-get update && \
+# bullseye left LTS 2026-08-31: deb.debian.org no longer serves its security
+# pool (404s) and the Release files are past Valid-Until, so a plain
+# `apt-get update && install` fails.  archive.debian.org carries bullseye main
+# (final point release) but not yet bullseye-security, so use main alone.
+RUN	echo 'deb http://archive.debian.org/debian bullseye main' > /etc/apt/sources.list && \
+	apt-get -o Acquire::Check-Valid-Until=false update && \
     apt-get install -y --no-install-recommends graphviz gosu postgresql-client openjdk-17-jre-headless && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
