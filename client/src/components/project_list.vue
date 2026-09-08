@@ -87,8 +87,9 @@
             <label class="form-check-label" for="cbgm-firsthand">
               First hand only
               <small class="text-muted">
-                &mdash; uncheck to also import correctors (C, C1, &hellip;) as
-                separate witnesses
+                &mdash; the original scribe's reading, or his/her own correction
+                (C*) where there is one; uncheck to also import later correctors
+                (C, C1, &hellip;) as separate witnesses
               </small>
             </label>
           </div>

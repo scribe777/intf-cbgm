@@ -77,7 +77,10 @@ DEFAULT_OPTIONS = {
     # all Greek manuscripts on an NT project, everything on an OT project.
     'doc_ranges': '',
     # Only the original scribe attests; unset, each corrector hand becomes a
-    # separate witness at its CORRECTOR_SLOTS hsnr.
+    # separate witness at its CORRECTOR_SLOTS hsnr.  In BOTH modes the INTF
+    # rule applies: where the original scribe corrected him/herself (hand 'C*',
+    # TEI corrector*), that self-correction IS the firsthand's reading and
+    # supersedes the uncorrected firsthand row; it is never a separate witness.
     'firsthand_only': True,
     # Whether a witness carrying the given siglum suffix still attests its
     # parent reading (collapsed, the classic treatment).  Unset, the witness is
@@ -277,6 +280,7 @@ class Importer:
                              if k in DEFAULT_OPTIONS})
         self.doc_ranges = parse_doc_ranges(self.options['doc_ranges'])
         self._skipped_hands = set()
+        self._superseded_firsthands = 0   # firsthand rows replaced by a C* self-correction
         self._books_seen = set()
         # The edition base text docID ('Edition Basetext Default'); set in
         # import_project from the project config.  Drives the apparatus
@@ -832,6 +836,16 @@ class Importer:
             n_seg += 1
             placed = set()        # ms_ids already given a reading at this passage
             seen_labez = set()    # labez already created (sub-readings fold in)
+            # INTF rule: a manuscript whose original scribe corrected him/herself
+            # here (hand 'C*') is represented by that self-correction, not by
+            # the uncorrected firsthand row.
+            self_corrected = set()
+            for witness in segment.iter('witness'):
+                if witness.get('hand') == 'C*':
+                    try:
+                        self_corrected.add(int(witness.get('docID')))
+                    except (TypeError, ValueError):
+                        pass
 
             for reading in segment.iter('segmentReading'):
                 labez = reading.get('label') or ''
@@ -845,8 +859,18 @@ class Importer:
 
                 for witness in reading.iter('witness'):
                     opts = self.options
+                    try:
+                        doc_id = int(witness.get('docID'))
+                    except (TypeError, ValueError):
+                        continue
                     hand = witness.get('hand') or ''
                     slot = 0
+                    if hand == 'C*':
+                        # the scribe's own correction stands in for the firsthand
+                        hand = ''
+                    elif not hand and doc_id in self_corrected:
+                        self._superseded_firsthands += 1
+                        continue    # superseded by this scribe's C* row
                     if hand:
                         # Only the original scribe by default (classic CBGM);
                         # when correctors are included, each hand becomes its
@@ -860,10 +884,6 @@ class Importer:
                                 log.warning("no hsnr slot for hand %r; "
                                             "skipping that hand", hand)
                             continue
-                    try:
-                        doc_id = int(witness.get('docID'))
-                    except (TypeError, ValueError):
-                        continue
                     if self.doc_ranges is not None:
                         # User-chosen docID ranges override the default rule.
                         if not any(lo <= doc_id <= hi
@@ -920,6 +940,9 @@ class Importer:
                     n_wit += 1
 
         self.conn.commit()
+        if self._superseded_firsthands:
+            log.info("%s: %d firsthand row(s) so far superseded by the scribe's "
+                     "own correction (C*)", osis_ref, self._superseded_firsthands)
         return n_seg, n_wit
 
     def import_project(self, object_part, project_name, progress=None):
@@ -1012,7 +1035,7 @@ def build_parser():
                         "on an NT project)")
     p.add_argument('--include-correctors', action='store_true',
                    help="import corrector hands (C, C1, ...) as separate "
-                        "witnesses (default: firsthand only)")
+                        "witnesses (default: firsthand only -- or the scribe's own C* correction where present)")
     p.add_argument('--exclude-supplements', action='store_true',
                    help="skip supplement leaves instead of importing them as "
                         "separate 'Xs' witnesses")
