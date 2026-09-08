@@ -108,11 +108,15 @@ def readings_of (conn, pass_id):
 
 
 def witnesses_of (conn, pass_id):
-    """labez -> [(hs, hsnr), ...] for the certain, non-z, collated witnesses."""
+    """labez -> [(hs, hsnr), ...] for the certain, non-z, collated witnesses.
+    A (hsnr 0) is excluded throughout the digest: it is the reconstruction the
+    model is asked to judge, so listing it as an attestor would leak the current
+    decision.  MT (hsnr 1) stays -- it is a real (majority) text."""
     res = execute (conn, """
         SELECT labez, hs, hsnr
         FROM apparatus_view_agg
         WHERE pass_id = :pass_id AND labez !~ '^z' AND certainty = 1.0
+          AND hsnr <> 0   -- A is the hypothesis under test, not an attestor
         ORDER BY labez, hsnr
     """, dict (parameters, pass_id = pass_id))
     out = collections.defaultdict (list)
@@ -168,7 +172,7 @@ def per_reading_coherence (conn, pass_id, rg_id):
     res = execute (conn, """
         WITH att AS (
             SELECT ms_id, labez FROM apparatus_view_agg
-            WHERE pass_id = :pass_id AND labez !~ '^z' AND certainty = 1.0
+            WHERE pass_id = :pass_id AND labez !~ '^z' AND certainty = 1.0 AND hsnr <> 0
         ),
         rel AS (
             SELECT att.labez AS lw, a.ms_id1 AS w, a.ms_id2 AS r,
@@ -212,7 +216,7 @@ def incoherent_witnesses (conn, pass_id, rg_id, cap = 15):
     res = execute (conn, """
         WITH att AS (
             SELECT ms_id, hs, labez FROM apparatus_view_agg
-            WHERE pass_id = :pass_id AND labez !~ '^z' AND certainty = 1.0
+            WHERE pass_id = :pass_id AND labez !~ '^z' AND certainty = 1.0 AND hsnr <> 0
         ),
         rel AS (
             SELECT att.ms_id AS w, att.hs AS whs, att.labez AS lw, a.ms_id2 AS r,
@@ -239,16 +243,49 @@ def incoherent_witnesses (conn, pass_id, rg_id, cap = 15):
 #  Witness weighting + composition (the PUSH path).                           #
 # --------------------------------------------------------------------------- #
 
-def _weight_bearing (wits, name_cap):
-    """Split [(hs, hsnr), ...] into (named sigla, total count).
+def a_linked_witnesses (conn, pass_id, rg_id):
+    """Sigla of the witnesses immediately linked to A in the general textual
+    flow: those whose rank-1 potential ancestor in the range is A (hsnr 0).
+    Same ranking as textflow.py's global flow (connectivity 1, affinity_view,
+    newer > older, common > ms1_length/2).  Genealogical, so it reflects the
+    CURRENT local-stemma decisions (Wachtel's criterion for weight-bearing)."""
+    res = execute (conn, """
+        WITH att AS (
+            SELECT ms_id FROM apparatus_view_agg
+            WHERE pass_id = :pass_id AND labez !~ '^z' AND certainty = 1.0 AND hsnr <> 0
+        ),
+        r AS (
+            SELECT a.ms_id1, a.ms_id2,
+                   rank () OVER (PARTITION BY a.ms_id1
+                                 ORDER BY a.affinity DESC, a.common, a.older, a.newer DESC, a.ms_id2) AS rank
+            FROM affinity_view a JOIN att ON att.ms_id = a.ms_id1
+            WHERE a.rg_id = :rg_id AND a.newer > a.older AND a.common > a.ms1_length / 2
+        )
+        SELECT w.hs
+        FROM r JOIN manuscripts anc ON anc.ms_id = r.ms_id2
+               JOIN manuscripts w   ON w.ms_id   = r.ms_id1
+        WHERE r.rank = 1 AND anc.hsnr = 0
+    """, dict (parameters, pass_id = pass_id, rg_id = rg_id))
+    return { r[0] for r in res }
 
-    Names the most significant witnesses first (lowest hsnr: A, MT, majuscules,
-    versions ... come before the minuscule mass) up to name_cap; the rest are
-    represented only by the count. For small versional projects every witness
-    is named. NOTE: hsnr-order significance is a heuristic to refine per project.
+
+def _weight_bearing (wits, name_cap, a_linked = frozenset ()):
+    """Split [(hs, hsnr), ...] into (named sigla, total count, A-linked sigla).
+
+    Names every witness immediately linked to A in the general textual flow
+    (a_linked; Wachtel: these carry the weight for the initial-text question),
+    then fills up to name_cap with the lowest hsnr (A, MT, majuscules, versions
+    ... before the minuscule mass); the rest are represented only by the count.
+    For small versional projects every witness is named.
     """
-    named = [hs for hs, _ in wits[:name_cap]]
-    return named, len (wits)
+    linked = [hs for hs, _ in wits if hs in a_linked]
+    named = list (linked)
+    for hs, _ in wits:
+        if len (named) >= max (name_cap, len (linked)):
+            break
+        if hs not in a_linked:
+            named.append (hs)
+    return named, len (wits), linked
 
 
 def build_unit (conn, pass_id, rg_id = None, k = 10, name_cap = 20):
@@ -261,15 +298,17 @@ def build_unit (conn, pass_id, rg_id = None, k = 10, name_cap = 20):
     texts = dict (readings_of (conn, pass_id))
     wits  = witnesses_of (conn, pass_id)
     coh   = per_reading_coherence (conn, pass_id, rg_id)
+    a_lnk = a_linked_witnesses (conn, pass_id, rg_id)
 
     readings = []
     for labez in sorted (set (texts) | set (wits)):
-        named, total = _weight_bearing (wits.get (labez, []), name_cap)
+        named, total, linked = _weight_bearing (wits.get (labez, []), name_cap, a_lnk)
         readings.append ({
             'labez': labez,
             'text': texts.get (labez, ''),
             'witnesses': named,
             'witnessCount': total,
+            'aLinked': linked,
         })
 
     unit = {
