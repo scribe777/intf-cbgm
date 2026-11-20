@@ -15,6 +15,7 @@
 import { select, selectAll } from 'd3-selection';
 
 import d3_common from 'd3_common';
+import tools     from 'tools';
 
 /**
  * Create an SVG graph from a dot program.
@@ -103,10 +104,14 @@ function load_dot (vm, dot) {
                 + vm.prefix + 'tid-' + d.elems[1].id
                 + (/dashed/.test (d.attrs.style) ? ' dashed' : '')
                 + (/dotted/.test (d.attrs.style) ? ' dotted' : '')
-                + (/bold/.test (d.attrs.style)   ? ' congruence-error' : '');
+                + (/bold/.test (d.attrs.style)   ? ' congruence-error' : '')
+                + (d.attrs.unstable ? ' unstable' : '');
         })
         .attr ('marker-end', `url(#${vm.prefix}triangle)`)
-        .attr ('d', d => d3_common.parse_path_svg (d.attrs.pos));
+        .attr ('d', d => d3_common.parse_path_svg (d.attrs.pos))
+        .filter (d => d.attrs && d.attrs.flips !== undefined)
+        .append ('title')
+        .text (d => tools.direction_stability_title (+d.attrs.prior, +d.attrs.posterior));
 
     link.filter (d => d.attrs && d.attrs.head_lp && d.attrs.headlabel)
         .append ('text')

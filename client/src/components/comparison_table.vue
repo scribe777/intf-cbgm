@@ -36,6 +36,8 @@
               title="Number of variants where no decision has been made about priority">Uncl</th>
           <th class="norel" data-sort-by="norel"
               title="Number of passages where the respective variants are unrelated">NoRel</th>
+          <th class="stab" data-sort-by="flips"
+              title="Stability of the direction: at how many passages the priority of the variants would have to be decided the other way for the direction to vanish.  Grey: a majority this narrow could be chance.">Stab</th>
         </tr>
       </thead>
       <tbody>
@@ -68,6 +70,7 @@
                 title="Number of variants where no decision has been made about priority">{{ r.unclear }}</td>
             <td class="norel"
                 title="Number of passages where the respective variants are unrelated">{{ r.norel }}</td>
+            <td class="stab" :class="{ 'unstable' : !r.stable }" :title="r.stab_title">{{ r.flips }}</td>
 
           </tr>
           <tr v-if="r.child" :key="r.rg_id + '_child'" :data-range="r.range" class="child">
@@ -129,7 +132,13 @@ function dir (r) {
  */
 
 function row_conversion (d) {
+    const st = tools.direction_stability (+d.older, +d.newer);
     return {
+        'flips'      : st.flips,
+        'stable'     : st.stable,
+        'stab_title' : tools.direction_stability_title (
+            Math.max (+d.older, +d.newer), Math.min (+d.older, +d.newer)
+        ),
         'rg_id'     : +d.rg_id,
         'range'     : d.range,
         'length1'   : +d.length1,
@@ -254,6 +263,10 @@ div.vm-comparison-table {
 
             &.direction {
                 text-align: center;
+            }
+
+            &.stab.unstable {
+                color: var(--gray);
             }
         }
     }

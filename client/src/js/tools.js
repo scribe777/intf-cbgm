@@ -160,6 +160,46 @@ export function fade_in (el) {
     return el.velocity ({ 'opacity' : 1.0 }, velocity_opts);
 }
 
+/**
+ * How stable is the genealogical direction between two witnesses?  The same
+ * rule as direction_stability () in server/textflow.py.
+ *
+ * @param {number} older - No. of passages where W1 has the prior variant
+ * @param {number} newer - No. of passages where W2 has the prior variant
+ * @returns {object} flips: at how many passages the priority of the variants
+ *                   would have to be turned around for the direction to vanish;
+ *                   stable: false if the majority could as well be the toss of
+ *                   a coin (sign test, 5 %); directed: false on equal counts.
+ */
+
+export function direction_stability (older, newer) {
+    const diff = Math.abs (newer - older);
+    return {
+        'flips'    : Math.ceil (diff / 2),
+        'stable'   : diff * diff > 3.84 * (older + newer),
+        'directed' : diff > 0,
+    };
+}
+
+/**
+ * Say the stability of a direction in a sentence, for a tooltip.
+ *
+ * @param {number} prior     - No. of passages where the ancestor has the prior variant
+ * @param {number} posterior - No. of passages where it has the posterior variant
+ * @returns {string} The sentence
+ */
+
+export function direction_stability_title (prior, posterior) {
+    const st = direction_stability (posterior, prior);
+    if (!st.directed) {
+        return `Prior at ${prior}, posterior at ${posterior} passages: no direction.`;
+    }
+    return `Prior at ${prior}, posterior at ${posterior} passages. `
+        + `The direction vanishes if ${st.flips} local `
+        + (st.flips === 1 ? 'stemma is' : 'stemmata are') + ' decided the other way.'
+        + (st.stable ? '' : ' Unstable: a majority this narrow could be chance.');
+}
+
 export default {
     format,
     natural_sort,
@@ -174,4 +214,6 @@ export default {
     fade_in,
     fade_out,
     velocity_opts,
+    direction_stability,
+    direction_stability_title,
 };

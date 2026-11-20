@@ -209,6 +209,16 @@ potential ancestor that best explains its reading.
 only my *Nth*-closest relative." High number = coherence red flag — the
 witness's closest relatives don't carry its reading.
 
+**Direction stability** (`textflow.py:direction_stability`, `client/src/js/tools.js`,
+2026-11) — display only, nothing above changes.  Each arrow carries `prior` /
+`posterior` (how often the parent has the earlier / the later variant against
+this witness), `flips` = ⌈(prior − posterior) / 2⌉, the number of local stemmata
+that would have to be decided the other way for the direction to vanish (the
+Guide to Genealogical Queries' own reading of the two counts), and `unstable`
+when (prior − posterior)² ≤ 3.84 (prior + posterior), a majority a coin could
+have thrown.  Unstable arrows are drawn thin and faint; the arrow's tooltip says
+the numbers; the relatives and comparison tables have a *Stab* column.
+
 **E. Prune** (`textflow.py:250`) — drop z leaf nodes (lacunose/uncertain)
 unless requested; remove isolated non-focus nodes; `var_only` extra cleanup;
 render to GraphViz dot.

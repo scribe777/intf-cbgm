@@ -23,6 +23,35 @@ from checks import congruence
 
 bp = flask.Blueprint ('textflow', __name__)
 
+DIRECTION_Z2 = 3.84
+"""1.96 squared: the bound of the sign test (normal approximation, 5 %, two-sided)
+:func:`direction_stability` holds a direction against."""
+
+
+def direction_stability (older, newer):
+    """How stable is the genealogical direction between two witnesses?
+
+    The Guide to Genealogical Queries reads the stability of a relation off the
+    difference between W1<W2 and W1>W2: "If the difference is minor, a potential
+    descendant could become a potential ancestor by changing a few local
+    stemmata."  We return that count and a flag.
+
+    :param int older: no. of passages where the first witness has the prior variant
+    :param int newer: no. of passages where the second witness has the prior variant
+
+    :returns: (flips, stable) -- flips: at how many passages the priority of the
+              variants would have to be turned around for the direction to
+              vanish; stable: False if the majority could as well be the toss
+              of a coin, (newer - older)² <= 3.84 (older + newer).  The passages
+              are not independent of each other, so this ranks relations, it
+              proves nothing.
+
+    """
+    diff   = abs (newer - older)
+    flips  = (diff + 1) // 2
+    stable = diff * diff > DIRECTION_Z2 * (older + newer)
+    return flips, stable
+
 
 def init_app (_app):
     """ Initialize the flask app. """
@@ -137,9 +166,9 @@ def textflow (passage_or_id):
         # query to get the closest ancestors for every node with rank <= connectivity
 
         query = """
-        SELECT ms_id1, ms_id2, rank
+        SELECT ms_id1, ms_id2, rank, older, newer
         FROM (
-          SELECT ms_id1, ms_id2, rank () OVER (PARTITION BY ms_id1
+          SELECT ms_id1, ms_id2, older, newer, rank () OVER (PARTITION BY ms_id1
              ORDER BY affinity DESC, common, older, newer DESC, ms_id2) AS rank
           FROM {view} a
           WHERE ms_id1 IN :nodes AND a.rg_id = :rg_id AND ms_id2 NOT IN :exclude
@@ -155,7 +184,7 @@ def textflow (passage_or_id):
                              labez = labez, connectivity = connectivity,
                              frag_where = frag_where, hyp_a = hyp_a))
 
-        Ranks = collections.namedtuple ('Ranks', 'ms_id1 ms_id2 rank')
+        Ranks = collections.namedtuple ('Ranks', 'ms_id1 ms_id2 rank older newer')
         ranks = list (map (Ranks._make, res))
 
         # Initially build an unconnected graph with one node for each
@@ -239,6 +268,16 @@ def textflow (passage_or_id):
                     graph.add_edge (r.ms_id2, r.ms_id1, rank = r.rank, headlabel = r.rank)
                 else:
                     graph.add_edge (r.ms_id2, r.ms_id1)
+
+                # how stable is the direction of this arrow?  The parent (ms2)
+                # has the prior variant r.newer times, the posterior r.older times.
+                flips, stable = direction_stability (r.older, r.newer)
+                edge = graph.adj[r.ms_id2][r.ms_id1]
+                edge['prior']     = r.newer
+                edge['posterior'] = r.older
+                edge['flips']     = flips
+                if not stable:
+                    edge['unstable'] = 1
 
                 if a1[group_field] == a2[group_field]:
                     # tag: has ancestor node within the same attestation

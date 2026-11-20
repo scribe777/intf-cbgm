@@ -52,6 +52,8 @@
                   title="Number of variants where no decision has been made about priority">Uncl</th>
               <th class="norel" data-sort-by="norel"
                   title="Number of passages where the respective variants are unrelated">NoRel</th>
+              <th class="stab" data-sort-by="flips"
+                  title="Stability of the direction: at how many passages the priority of the variants would have to be decided the other way for the direction to vanish.  Grey: a majority this narrow could be chance.">Stab</th>
               <th class="d-print-none"
                   title="Open Manuscripts Comparison view"></th>
               <th class="d-print-none"
@@ -72,6 +74,7 @@
               <td class="older">{{ r.older }}</td>
               <td class="unclear">{{ r.unclear }}</td>
               <td class="norel">{{ r.norel }}</td>
+              <td class="stab" :class="{ 'unstable' : !r.stable }" :title="r.stab_title">{{ r.flips }}</td>
               <td class="compare d-print-none" :title="`Compare ${ms.hs} and ${r.hs}`"
                   @click.stop="on_compare (r.ms_id)">
                 <span class="fas fa-balance-scale"></span>
@@ -190,7 +193,13 @@ export default {
                 }
                 const records = csv_parse (responses[1].data, { 'columns' : true });
                 vm.rows = records.map ((d) => {
+                    const st = tools.direction_stability (+d.older, +d.newer);
                     return {
+                        'flips'      : st.flips,
+                        'stable'     : st.stable,
+                        'stab_title' : tools.direction_stability_title (
+                            Math.max (+d.older, +d.newer), Math.min (+d.older, +d.newer)
+                        ),
                         'rank'      : +d.rank || '',
                         'rank_sort' : +d.rank || 9999,
                         'ms_id'     : +d.ms_id,
@@ -293,6 +302,10 @@ div.vm-relatives-table {
 
             &.ms {
                 text-align: left;
+            }
+
+            &.stab.unstable {
+                color: var(--gray);
             }
 
             span.fas {

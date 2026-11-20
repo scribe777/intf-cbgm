@@ -351,6 +351,12 @@ div.vm-coherence {
                 stroke-width: 6px;
             }
 
+            /* a direction resting on a narrow majority, see: tools.direction_stability () */
+            &.unstable {
+                stroke-opacity: 0.3;
+                stroke-width: 1px;
+            }
+
             &.hover {
                 stroke-opacity: 1;
             }
