@@ -23,8 +23,11 @@ local stemma it is trying to propose.
 """
 
 import collections
+import html
 import json
 import os
+import time
+from xml.dom import minidom
 
 import flask
 from flask import request, current_app
@@ -34,12 +37,22 @@ import requests
 from ntg_common.db_tools import execute
 
 from helpers import parameters, Passage
+import login
 from login import edit_auth
 
 bp = flask.Blueprint ('cbgm_ai', __name__)
 
 SCHEMA_VERSION = '1.0'
 AI_SERVER_URL  = 'http://127.0.0.1:8078/localstemma'   # the warm JVM co-process
+
+# The hosted twins on the NTVMR (vmrcre vmr/api/cbgm/localstemma/).  Same unit
+# in, same result out; the key is resolved THERE for the logged-in user (own key
+# -> the project's key -> the systemwide key), so nobody has to put a key in a
+# file beside the compose file.  The key itself never reaches this app.
+HOSTED_SUGGEST = 'cbgm/localstemma/suggest'
+HOSTED_ENGINES = 'cbgm/localstemma/engines'
+HOSTED_TIMEOUT = (3.05, 240)      # (connect, read): a model call takes a while
+HOSTED_ENGINES_TTL = 60           # seconds a session's engine list is reused
 
 # engine name (AIEngine.getName) -> the API-key env var that enables it, and a
 # display label.  Used to offer only usable engines in the model picker.
@@ -90,6 +103,68 @@ def _price (engine, model_id, tokens_in, tokens_out, cached):
 def init_app (_app):
     """ Initialize the flask app. """
     pass
+
+
+# --------------------------------------------------------------------------- #
+#  Whose key pays                                                              #
+#                                                                              #
+#  Two places a key can come from.  LOCAL: an engine key in this container's   #
+#  environment, spent by the JVM co-process -- works offline, and is what an   #
+#  operator who put one there asked for, so it wins for that engine.  HOSTED:  #
+#  whatever the NTVMR resolves for the logged-in user on this project -- no    #
+#  setup here at all.  An engine is offered when either can pay for it.        #
+# --------------------------------------------------------------------------- #
+
+def _local_engines ():
+    """Engines the in-container co-process can pay for: it is enabled and the
+    engine's key is in the environment."""
+    if not os.environ.get ('AI_LOCALSTEMMA_ENABLED'):
+        return set ()
+    return { name for name, key in ENGINE_KEY_ENV.items () if os.environ.get (key) }
+
+
+def _session_hash ():
+    """The logged-in user's NTVMR session, or None (anonymous, local user,
+    offline fallback identity without a live session)."""
+    return getattr (flask_login.current_user, 'api_key', None)
+
+
+_hosted_engines_cache = {}   # (api url, session, project) -> (expiry, engines)
+
+
+def _hosted_engines ():
+    """{ engine: { 'keySource', 'defaultModel' } } for the engines the NTVMR
+    would let this user spend here, each with the budget that would pay (user |
+    project | system).  {} when not logged in, the NTVMR is unreachable, or it
+    predates the endpoint -- none of which is an error: the local keys remain."""
+    sh = _session_hash ()
+    if not sh:
+        return {}
+    project = current_app.config.get ('VMRCRE_PROJECT_NAME') or ''
+    cache_key = (login.vmrcre_api_url (), sh, project)
+    now = time.monotonic ()
+    hit = _hosted_engines_cache.get (cache_key)
+    if hit and hit[0] > now:
+        return hit[1]
+
+    data = { 'format' : 'xml' }
+    if project:
+        data['projectName'] = project
+    root = login.vmrcre_service_request (HOSTED_ENGINES, data, sh)
+    if root is None or root.tagName != 'engines':
+        return {}     # not cached: connectivity can return at any moment
+    engines = {}
+    for e in root.getElementsByTagName ('engine'):
+        if e.getAttribute ('available') == 'true':
+            engines[e.getAttribute ('name')] = {
+                'keySource'    : e.getAttribute ('keySource'),
+                'defaultModel' : e.getAttribute ('defaultModel') or None,
+            }
+    engines['_default'] = root.getAttribute ('default') or None
+    if len (_hosted_engines_cache) > 256:
+        _hosted_engines_cache.clear ()
+    _hosted_engines_cache[cache_key] = (now + HOSTED_ENGINES_TTL, engines)
+    return engines
 
 
 # --------------------------------------------------------------------------- #
@@ -343,24 +418,36 @@ TOOLS = {
 @bp.route ('/models')
 def models ():
     """The engine/model catalogue for the AI picker, an optgroup-shaped list
-    limited to engines that have an API key configured in this container (so the
-    picker only offers usable choices).  Reads the same models.json that
-    crosswire.jar's ModelRegistry does."""
+    limited to engines somebody can pay for (so the picker only offers usable
+    choices): a key in this container, or one the NTVMR resolves for the
+    logged-in user on this project.  keySource says which -- local | user |
+    project | system.  Reads the same models.json that crosswire.jar's
+    ModelRegistry does."""
     catalogue = _model_catalogue ()
+    local  = _local_engines ()
+    hosted = _hosted_engines ()
     engines = []
-    for name, key in ENGINE_KEY_ENV.items ():
+    for name in ENGINE_KEY_ENV:
         models_ = catalogue.get (name)
-        if not models_ or not os.environ.get (key):
+        if not models_:
+            continue
+        if name in local:
+            source = 'local'
+        elif name in hosted:
+            source = hosted[name]['keySource']
+        else:
             continue
         engines.append ({
-            'engine' : name,
-            'label'  : ENGINE_LABELS.get (name, name),
-            'models' : [{ 'id' : m['id'], 'name' : m.get ('name', m['id']) }
-                        for m in models_ if isinstance (m, dict) and m.get ('id')],
+            'engine'    : name,
+            'label'     : ENGINE_LABELS.get (name, name),
+            'keySource' : source,
+            'models'    : [{ 'id' : m['id'], 'name' : m.get ('name', m['id']) }
+                           for m in models_ if isinstance (m, dict) and m.get ('id')],
         })
     return flask.jsonify ({
         'engines' : engines,
-        'default' : os.environ.get ('AI_DEFAULT_ENGINE', 'gemini'),
+        'default' : (os.environ.get ('AI_DEFAULT_ENGINE')
+                     or hosted.get ('_default') or 'gemini'),
     })
 
 
@@ -383,6 +470,26 @@ def local_stemma (passage_or_id):
 
 
 def _ask_model (unit, engine, model = None):
+    """Ask for a local stemma and return (result, reachable).
+
+    A key for this engine in the container goes to the warm JVM co-process;
+    otherwise the unit goes to the NTVMR, which pays with whatever key it
+    resolves for the logged-in user on this project.  result carries keySource
+    (local | user | project | system) on success and 'error' when nobody could
+    answer; reachable=False means no AI service was reached at all."""
+    if engine in _local_engines ():
+        result, reachable = _ask_local (unit, engine, model)
+        if reachable or not _session_hash ():
+            return result, reachable
+        # the co-process is down but the user is logged in: the NTVMR may pay
+    if _session_hash ():
+        return _ask_hosted (unit, engine, model)
+    return { 'error': 'No AI key to pay for this: log in to the NTVMR, where '
+                      'your own or your project\'s key is used, or set the '
+                      'engine\'s key in the container environment.' }, True
+
+
+def _ask_local (unit, engine, model = None):
     """POST a unit to the warm JVM co-process and return its parsed result, or a
     ({'error'}, reachable=False) tuple if the AI server is not up.  A non-empty
     model overrides the engine's default; the JVM validates it against the
@@ -395,9 +502,64 @@ def _ask_model (unit, engine, model = None):
     except requests.RequestException as e:
         return { 'error': 'AI server unavailable: %s' % e }, False
     try:
-        return resp.json (), True
+        return dict (resp.json (), keySource = 'local'), True
     except ValueError:
         return { 'error': 'AI server returned non-JSON', 'raw': resp.text[:500] }, True
+
+
+def _ask_hosted (unit, engine, model = None):
+    """POST a unit to the NTVMR's hosted endpoint as the logged-in user.
+
+    Not through login.vmrcre_service_request: its read timeout suits metadata
+    calls, and a model that is merely slow must not trip the breaker that every
+    other NTVMR call shares.  A refusal (no key anywhere, or a key the user may
+    not spend) comes back as the NTVMR's own message, reachable=True."""
+    if login.circuit_open ():
+        return { 'error': 'The NTVMR is unreachable, so no key there can be used.' }, False
+    data = {
+        'unit'        : json.dumps (unit),
+        'engine'      : engine,
+        'format'      : 'xml',
+        'sessionHash' : _session_hash (),
+    }
+    if model:
+        data['model'] = model
+    project = current_app.config.get ('VMRCRE_PROJECT_NAME')
+    if project:
+        data['projectName'] = project
+    url = login.vmrcre_api_url () + HOSTED_SUGGEST + '/'
+    try:
+        resp = requests.post (url, data = data, timeout = HOSTED_TIMEOUT,
+                              headers = { 'User-Agent': login.USER_AGENT })
+    except requests.RequestException as e:
+        return { 'error': 'NTVMR AI service unavailable: %s' % e }, False
+    try:
+        root = minidom.parseString (resp.text.encode ('utf-8')).documentElement
+    except Exception:  # pylint: disable=broad-except
+        if resp.status_code == 404:    # an NTVMR that predates the endpoint
+            return { 'error': 'This NTVMR does not offer AI local stemmata yet.' }, False
+        return { 'error': 'NTVMR AI service returned an unreadable answer',
+                 'raw': resp.text[:500] }, True
+    if root.tagName != 'localStemma':
+        return { 'error': _error_message (root) or 'NTVMR AI service refused the request' }, True
+    node = root.getElementsByTagName ('result')
+    text = ''.join (c.data for c in node[0].childNodes
+                    if c.nodeType in (c.TEXT_NODE, c.CDATA_SECTION_NODE)) if node else ''
+    try:
+        return json.loads (text), True
+    except ValueError:
+        return { 'error': root.getAttribute ('error')
+                          or 'NTVMR AI service returned no result' }, True
+
+
+def _error_message (root):
+    """The human-readable message of an NTVMR error response."""
+    for e in [root] + list (root.getElementsByTagName ('error')):
+        msg = e.getAttribute ('message')
+        if msg:
+            # the NTVMR entity-encodes the message before the XML layer does
+            return html.unescape (msg)
+    return None
 
 
 def suggestion_fragment (begadr, endadr, result):
@@ -434,6 +596,8 @@ def suggestion_fragment (begadr, endadr, result):
             'comments': result.get ('comments'),
             'rationale': rationale,
             'attempts': result.get ('attempts'),
+            # whose key paid: local | user | project | system
+            'keySource': result.get ('keySource'),
             # metering, preserved so a re-opened suggestion still shows its
             # cost + time (the panel renders these).
             'tokensIn': tokens_in,

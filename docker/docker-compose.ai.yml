@@ -1,5 +1,12 @@
 # AI overlay — enable the in-container local-stemma JVM co-process.
 #
+# OPTIONAL. You do not need this overlay, or any key in a file here, to use
+# [Suggest Local Stemma]: a user logged in to the NTVMR spends the key the NTVMR
+# resolves for them on the project (their own, the project's, or the systemwide
+# one), and the key never leaves the NTVMR. Use this overlay to work offline, or
+# to pay with a key you would rather keep on this machine; an engine whose key
+# is set here is paid for from here.
+#
 #   docker compose -f docker-compose.crosswire.yml -f docker-compose.ai.yml up
 #   (composes onto the localonly stack the same way)
 #

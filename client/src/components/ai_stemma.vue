@@ -29,7 +29,9 @@
               @click="menuOpen = !menuOpen">▾</button>
       <div v-if="menuOpen" class="ai-menu">
         <template v-for="grp in catalogue">
-          <div :key="'g/' + grp.engine" class="ai-menu-group">{{ grp.label }}</div>
+          <div :key="'g/' + grp.engine" class="ai-menu-group">{{ grp.label }}<span
+               v-if="keyLabel (grp.keySource)" class="ai-menu-src"
+               :title="'Calls to ' + grp.label + ' are paid with ' + keyLabel (grp.keySource) + '.'">{{ keyLabel (grp.keySource) }}</span></div>
           <button v-for="m in grp.models" :key="grp.engine + '::' + m.id"
                   type="button" class="ai-menu-item"
                   :class="{ 'ai-menu-sel' : selected === grp.engine + '::' + m.id }"
@@ -261,8 +263,18 @@ export default {
     },
     'mounted' : function () { this.loadModels (); this.refresh (); },
     'methods' : {
-        /** Fetch the engine/model catalogue (only key-configured engines) and
-         *  default the picker to the server's preferred engine. */
+        /** Whose key pays for an engine, as the server reports it: one set on
+         *  this machine, or one the NTVMR resolves for the logged-in user. */
+        keyLabel (source) {
+            return ({
+                'local'   : 'key on this machine',
+                'user'    : 'your NTVMR key',
+                'project' : 'the project’s key',
+                'system'  : 'the NTVMR’s shared key',
+            })[source] || '';
+        },
+        /** Fetch the engine/model catalogue (only engines somebody can pay
+         *  for) and default the picker to the server's preferred engine. */
         loadModels () {
             const vm = this;
             vm.get ('models')
@@ -510,6 +522,13 @@ $ai-soft: #8b6df0;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: #636b82;
+}
+.ai-menu-src {
+    margin-left: 0.6em;
+    text-transform: none;
+    letter-spacing: 0;
+    font-style: italic;
+    color: #8a91a5;
 }
 .ai-menu-item {
     display: flex;
