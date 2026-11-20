@@ -228,6 +228,19 @@ def stemma_edit (passage_or_id):
 
         # return the changed passage
         passage = Passage (conn, passage_or_id)
+        # mark this segment dirty in the local outbox and debounce a flush to
+        # the NTVMR (per-user, per-segment).  See cbgm_backup / vmrcre/README.md.
+        try:
+            import cbgm_backup
+            user = flask_login.current_user
+            cbgm_backup.on_edit (
+                current_app._get_current_object (),
+                current_app.config.get ('VMRCRE_PROJECT_NAME'),
+                passage.start, passage.end,
+                getattr (user, 'username', None),
+                getattr (user, 'api_key', None))
+        except Exception:  # pylint: disable=broad-except
+            tools.log (logging.WARNING, 'editorial auto-save scheduling failed')
         return make_json_response (passage.to_json ())
 
     raise EditError ('Could not edit local stemma.')

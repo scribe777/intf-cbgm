@@ -183,7 +183,7 @@ def copy_att (dba, parameters):
 
             rows = execute (dest, """
             INSERT INTO {dest_table} ({dest_columns}, passage)
-            SELECT {source_columns}, int4range (begadr, endadr + 1)
+            SELECT {source_columns}, int8range (begadr, endadr + 1)
             FROM {source_table} s
             WHERE endadr >= begadr
             ON CONFLICT DO NOTHING
@@ -193,6 +193,35 @@ def copy_att (dba, parameters):
 
     with dba.engine.begin () as conn:
         log (logging.INFO, '          Tweaking tables')
+
+        # Re-encode source addresses into the tbbb scheme.  Upstream att/lac use
+        # the legacy 2-digit layout (bare book * 10^7 + chapter * 10^5 +
+        # verse * 10^3 + word); ntg_common.tools.BOOKS and the books table use
+        # the VMRCRE versehash "tbbbcccvvv" plus a 3-digit word:
+        # (testament*1000 + book) * 10^9 + chapter * 10^6 + verse * 10^3 + word.
+        # Without this the "books.passage @> begadr" join in fill_passages_table
+        # would never match.  '/' is integer division on bigint; mod() avoids a
+        # literal '%' in the SQL.  Skips anything already in the new layout
+        # (>= 10^12; legacy addresses are < 10^9).
+        tbbb = next ((b[0] for b in tools.BOOKS if book in (b[1], b[2])), None)
+        if tbbb is None:
+            raise ValueError ('book %r not in ntg_common.tools.BOOKS' % book)
+        testament = tbbb // 1000
+        for tbl in ('att', 'lac'):
+            execute (conn, """
+            UPDATE """ + tbl + """ SET
+              begadr = (""" + str (testament) + """ * 1000 + begadr / 10000000) * 1000000000
+                     + mod (begadr / 100000, 100) * 1000000
+                     + mod (begadr / 1000, 100) * 1000 + mod (begadr, 1000),
+              endadr = (""" + str (testament) + """ * 1000 + endadr / 10000000) * 1000000000
+                     + mod (endadr / 100000, 100) * 1000000
+                     + mod (endadr / 1000, 100) * 1000 + mod (endadr, 1000)
+            WHERE begadr < 1000000000
+            """, parameters)
+            execute (conn, """
+            UPDATE """ + tbl + """ SET passage = int8range (begadr, endadr + 1)
+            WHERE endadr >= begadr
+            """, parameters)
 
         if book in ('Acts', 'Mark', 'Matt'):
             # we cannot delete 'A' because in a negative apparatus it holds unique readings.
@@ -649,10 +678,17 @@ def copy_nestle (dbdest, parameters):
         TRUNCATE nestle RESTART IDENTITY
         """, parameters)
 
+        # Re-encode addresses into the tbbb scheme (see copy_att).  The Nestle
+        # base text is New Testament, so testament = 2.
         execute (dest, """
         INSERT INTO nestle (begadr, endadr, passage, lemma)
-        SELECT adr, adr, int4range (adr, adr + 1), content
-        FROM original_nestle
+        SELECT a, a, int8range (a, a + 1), content
+        FROM (
+          SELECT (2 * 1000 + adr / 10000000) * 1000000000
+               + mod (adr / 100000, 100) * 1000000
+               + mod (adr / 1000, 100) * 1000 + mod (adr, 1000) AS a, content
+          FROM original_nestle
+        ) s
         """, parameters)
 
 def fill_passages_table (dba, parameters):
@@ -670,9 +706,11 @@ def fill_passages_table (dba, parameters):
 
         Book = collections.namedtuple ('Book', 'bk_id siglum book ranges')
 
+        # bk_id is the tbbb id (see ntg_common.tools.BOOKS); the address layout
+        # is tbbb * 10^9 + chapter * 10^6 + verse * 10^3 + word (int8range).
         executemany (conn, """
         INSERT INTO books (bk_id, siglum, book, passage)
-        VALUES (:bk_id, :siglum, :book, int4range (:bk_id * 10000000, (:bk_id + 1) * 10000000))
+        VALUES (:bk_id, :siglum, :book, int8range (:bk_id * 1000000000, (:bk_id + 1) * 1000000000))
         """, parameters, [ Book._make (b)._asdict () for b in tools.BOOKS if b[3] > 0])
 
         # The Ranges Table
@@ -680,26 +718,26 @@ def fill_passages_table (dba, parameters):
         params = []
         for b in map (Book._make, tools.BOOKS):
             if b.ranges > 0:
-                offset = 10000000 * b.bk_id
-                params.append ([b.bk_id, 'All', offset, offset + 10000000])
+                offset = 1000000000 * b.bk_id
+                params.append ([b.bk_id, 'All', offset, offset + 1000000000])
                 for ch in range (1, b.ranges + 1):
-                    params.append ([b.bk_id, str (ch), offset + ch * 100000, offset + ((ch + 1) * 100000)])
+                    params.append ([b.bk_id, str (ch), offset + ch * 1000000, offset + ((ch + 1) * 1000000)])
 
         executemany_raw (conn, """
         INSERT INTO ranges (bk_id, range, passage)
-        VALUES (%s, %s, int4range (%s, %s))
+        VALUES (%s, %s, int8range (%s, %s))
         """, parameters, params)
 
         # The Passages Table
 
         execute (conn, """
         INSERT INTO passages (begadr, endadr, passage, variant, bk_id)
-        SELECT begadr, endadr, int4range (begadr, endadr + 1),
+        SELECT begadr, endadr, int8range (begadr, endadr + 1),
                True, bk_id
         FROM att a
         JOIN books b
           ON b.passage @> begadr
-        GROUP BY begadr, endadr, int4range (begadr, endadr + 1), bk_id
+        GROUP BY begadr, endadr, int8range (begadr, endadr + 1), bk_id
         ORDER BY begadr, endadr DESC
         """, parameters)
 

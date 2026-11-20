@@ -76,3 +76,7 @@ docker/server
 docker/ntg_common
 docker/client
 docker/scripts
+docker/ai
+# run-time engine API keys — supplied at `docker compose up`, never committed
+.env
+docker/.env

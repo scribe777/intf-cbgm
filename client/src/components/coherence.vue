@@ -3,6 +3,10 @@
        @epoch="on_epoch"
        @goto_attestation="on_goto_attestation"
        @coherence_in_attestations_variant_changed="on_coherence_in_attestations_variant_changed"
+       @ai_proposal="on_ai_proposal"
+       @ai_hover="on_ai_hover"
+       @stemma_state="on_stemma_state"
+       @load_editor="on_load_editor"
   >
     <div class="container bs-docs-container">
       <!-- the parent for all floating cards must be at the top of the page so
@@ -10,8 +14,9 @@
            only contain absolute-positioned stuff and thus has a height of 0 -->
       <relatives :pass_id="pass_id" ref="relatives" />
 
-      <div class="btn-toolbar">
+      <div class="btn-toolbar align-items-center">
         <navigator @input="on_nav" :value="pass_id" class="mb-3" />
+        <sync-status :epoch="epoch" />
       </div>
 
       <leitzeile :pass_id="pass_id" />
@@ -31,9 +36,12 @@
       <card class="card-local-stemma card-wide">
         <card-caption>
           Local Stemma
+          <editor-decisions ref="editor_decisions" :pass_id="pass_id" :epoch="epoch" />
+          <ai-stemma :pass_id="pass_id" :epoch="epoch" :stemma_state="stemmaState" />
         </card-caption>
 
-        <localstemma :pass_id="pass_id" :epoch="epoch" />
+        <localstemma :pass_id="pass_id" :epoch="epoch" :ai_edges="aiProposal"
+                     :ai_hover="aiHover" />
       </card>
 
       <!-- Notes -->
@@ -112,10 +120,13 @@ import Vue from 'vue';
 import apparatus        from 'apparatus.vue';
 import d3_chord_layout  from 'd3_chord_layout.vue';
 import d3_stemma_layout from 'd3_stemma_layout.vue';
+import editor_decisions from 'editor_decisions.vue';
+import ai_stemma        from 'ai_stemma.vue';
 import leitzeile        from 'leitzeile.vue';
 import local_stemma     from 'local_stemma.vue';
 import notes            from 'notes.vue';
 import relatives        from 'relatives.vue';
+import sync_status      from 'sync_status.vue';
 import textflow         from 'textflow.vue';
 import tools            from 'tools';
 
@@ -133,6 +144,8 @@ Vue.component ('card-caption', card_caption);
 Vue.component ('connectivity', connectivity);
 Vue.component ('d3chord',      d3_chord_layout);
 Vue.component ('d3stemma',     d3_stemma_layout);
+Vue.component ('editor-decisions', editor_decisions);
+Vue.component ('ai-stemma',    ai_stemma);
 Vue.component ('labezator',    labezator);
 Vue.component ('leitzeile',    leitzeile);
 Vue.component ('localstemma',  local_stemma);
@@ -140,6 +153,7 @@ Vue.component ('navigator',    navigator);
 Vue.component ('notes',        notes);
 Vue.component ('range',        range);
 Vue.component ('relatives',    relatives);
+Vue.component ('sync-status',  sync_status);
 Vue.component ('textflow',     textflow);
 Vue.component ('toolbar',      toolbar);
 Vue.component ('toolbar',      toolbar);
@@ -152,6 +166,9 @@ export default {
         return {
             'pass_id' : 0,  // Number !!!
             'epoch'   : 1,  // bump this to reload components
+            'aiProposal' : null, // AI-proposed edges to ghost on the stemma
+            'aiHover'    : null, // which proposed edge the user is hovering
+            'stemmaState': null, // current { reading: sourceLabez } of the stemma
         };
     },
     /** @lends module:client/coherence */
@@ -165,13 +182,18 @@ export default {
         set_passage (passage_or_id) {
             const vm = this;
 
-            const p = Promise.all ([
-                vm.get ('passage.json/' + passage_or_id),
-            ]);
-            p.then ((responses) => {
-                const passage = responses[0].data.data;
-                vm.pass_id = passage.pass_id; // Number! updates our children
-                this.$store.commit ('caption', passage.hr);
+            const p = vm.get ('passage.json/' + passage_or_id).then ((response) => {
+                const passage = response.data.data;
+                // Auto-apply this verse's saved editorial decisions (mine if I
+                // have any here, else a collaborator's) BEFORE showing the
+                // stemma, so it reflects saved work rather than the
+                // dump/import baseline. Harmless no-op when no one has data.
+                return vm.post ('editorial/autoload.json/' + passage.pass_id)
+                    .catch (() => null)
+                    .then (() => {
+                        vm.pass_id = passage.pass_id; // Number! updates children
+                        vm.$store.commit ('caption', passage.hr);
+                    });
             });
             return p;
         },
@@ -199,6 +221,28 @@ export default {
         on_epoch () {
             this.epoch++;
             // console.log ('epoch: ' + this.epoch);
+        },
+        /** AI proposed (or cleared) a stemma — ghost its edges on the graph. */
+        on_ai_proposal (event) {
+            this.aiProposal = (event.detail && event.detail.data) || null;
+        },
+        /** User hovered (or left) a suggestion card — emphasise that ghost edge. */
+        on_ai_hover (event) {
+            this.aiHover = (event.detail && event.detail.data) || null;
+        },
+        /** The stemma (re)loaded — remember its current edges so the AI panel
+         *  can distinguish real change-suggestions from already-selected paths. */
+        on_stemma_state (event) {
+            this.stemmaState = (event.detail && event.detail.data) || null;
+        },
+        /** A human-editor pill in the AI panel's contributor strip — route to
+         *  editor_decisions, which owns the load + unsynced-changes confirm. */
+        on_load_editor (event) {
+            const who = event.detail && event.detail.data;
+            const ed  = this.$refs.editor_decisions;
+            if (who && ed) {
+                ed.load_user (who);
+            }
         },
         /**
          * Scroll to the "Coherence in Attestations" card and load the given

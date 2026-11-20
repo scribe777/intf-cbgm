@@ -191,14 +191,14 @@ def leitzeile_json (passage_or_id):
         SELECT l.begadr, l.endadr, l.lemma, ARRAY_AGG (p.pass_id)
         FROM nestle l
           LEFT JOIN passages p ON (p.passage @> l.passage)
-        WHERE int4range (:start, :end + 1) @> l.passage
+        WHERE int8range (:start, :end + 1) @> l.passage
         GROUP BY l.begadr, l.endadr, l.lemma
 
         UNION -- get the insertions
 
         SELECT p.begadr, p.endadr, '', ARRAY_AGG (p.pass_id)
         FROM passages_view p
-        WHERE int4range (:start, :end + 1) @> p.passage AND (begadr % 2) = 1
+        WHERE int8range (:start, :end + 1) @> p.passage AND (begadr % 2) = 1
         GROUP BY p.begadr, p.endadr
 
         ORDER BY begadr, endadr DESC

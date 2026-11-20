@@ -98,6 +98,7 @@ export default {
 
     table.item {
         display: inline-table;
+        margin-right: .5em;
 
         td.word {
             font-size: smaller;

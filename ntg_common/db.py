@@ -5,14 +5,14 @@ we need for doing the CBGM and running the application server.
 
 """
 
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, Column, Index, ForeignKey
+from sqlalchemy import String, Integer, BigInteger, SmallInteger, Float, Boolean, DateTime, Column, Index, ForeignKey
 from sqlalchemy import UniqueConstraint, CheckConstraint, ForeignKeyConstraint, PrimaryKeyConstraint
 from sqlalchemy.dialects.postgresql import TSTZRANGE
 from sqlalchemy.ext import compiler
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.schema import DDLElement
 from sqlalchemy.sql import text
-from sqlalchemy_utils import IntRangeType
+from sqlalchemy_utils import IntRangeType, Int8RangeType
 
 # let sqlalchemy manage our views
 
@@ -305,8 +305,8 @@ class Att (Base):
     id           = Column (Integer,       primary_key = True, autoincrement = True)
     hsnr         = Column (Integer,       nullable = False, index = True)
     hs           = Column (String(32),    nullable = False, index = True)
-    begadr       = Column (Integer,       nullable = False, index = True)
-    endadr       = Column (Integer,       nullable = False, index = True)
+    begadr       = Column (BigInteger,    nullable = False, index = True)
+    endadr       = Column (BigInteger,    nullable = False, index = True)
     labez        = Column (String(64),    nullable = False, server_default = '')
     labezsuf     = Column (String(64),    server_default = '')
     certainty    = Column (Float(16),     nullable = False, server_default = '1.0')
@@ -334,7 +334,7 @@ class Att (Base):
     comp1        = Column (String(1),     server_default = '')
     printout     = Column (String(32),    server_default = '')
     category     = Column (String(1),     server_default = '')
-    passage      = Column (IntRangeType,  nullable = False)
+    passage      = Column (Int8RangeType,  nullable = False)
 
     __table_args__ = (
         Index ('ix_att_begadr_endadr_hs', begadr, endadr, hs),
@@ -366,8 +366,8 @@ class Lac (Base):
     id        = Column (Integer,       primary_key = True, autoincrement = True)
     hsnr      = Column (Integer,       nullable = False)
     hs        = Column (String(32),    nullable = False)
-    begadr    = Column (Integer,       nullable = False)
-    endadr    = Column (Integer,       nullable = False)
+    begadr    = Column (BigInteger,    nullable = False)
+    endadr    = Column (BigInteger,    nullable = False)
     labez     = Column (String(64),    server_default = '')
     labezsuf  = Column (String(64),    server_default = '')
     lemma     = Column (String(1024),  server_default = '')
@@ -392,7 +392,7 @@ class Lac (Base):
     comp1     = Column (String(1),     server_default = '')
     printout  = Column (String(32),    server_default = '')
     category  = Column (String(1),     server_default = '')
-    passage   = Column (IntRangeType,  nullable = False)
+    passage   = Column (Int8RangeType,  nullable = False)
 
     __table_args__ = (
         Index ('ix_lac_passage_gist', passage, postgresql_using = 'gist'),
@@ -408,20 +408,24 @@ function ('ord_labez', Base.metadata, 'l CHAR (2)', 'INTEGER', '''
     SELECT CASE WHEN ascii (l) >= 122 THEN 0 ELSE ascii (l) - 96 END
     ''', volatility = 'IMMUTABLE')
 
-function ('adr2bk_id', Base.metadata, 'adr INTEGER', 'INTEGER', '''
-    SELECT (adr / 10000000)
+# Address layout is the VMRCRE versehash "tbbbcccvvv" plus a 3-digit word:
+#   bk_id (tbbb) * 1,000,000,000 + chapter * 1,000,000 + verse * 1,000 + word
+# chapter and verse are 3 digits each so books with > 99 chapters (Psalms: 151)
+# or > 99 verses (Ps 119: 176) do not overflow.  Stored as int8.
+function ('adr2bk_id', Base.metadata, 'adr BIGINT', 'INTEGER', '''
+    SELECT (adr / 1000000000)::integer
     ''', volatility = 'IMMUTABLE')
 
-function ('adr2chapter', Base.metadata, 'adr INTEGER', 'INTEGER', '''
-    SELECT ((adr / 100000) %% 100)
+function ('adr2chapter', Base.metadata, 'adr BIGINT', 'INTEGER', '''
+    SELECT ((adr / 1000000) %% 1000)::integer
     ''', volatility = 'IMMUTABLE')
 
-function ('adr2verse', Base.metadata, 'adr INTEGER', 'INTEGER', '''
-    SELECT ((adr / 1000) %% 100)
+function ('adr2verse', Base.metadata, 'adr BIGINT', 'INTEGER', '''
+    SELECT ((adr / 1000) %% 1000)::integer
     ''', volatility = 'IMMUTABLE')
 
-function ('adr2word', Base.metadata, 'adr INTEGER', 'INTEGER', '''
-    SELECT (adr %% 1000)
+function ('adr2word', Base.metadata, 'adr BIGINT', 'INTEGER', '''
+    SELECT (adr %% 1000)::integer
     ''', volatility = 'IMMUTABLE')
 
 
@@ -503,9 +507,16 @@ class Books (Base2):
 
     bk_id     = Column (Integer,       primary_key = True, autoincrement = True)
 
+    # The v11n collection this book belongs to: 1 = OT, 2 = NT (matches the
+    # VMRCRE v11n collectionID, e.g. LXXNU collection 1=OT / 2=NT).  A project is
+    # always wholly OT or wholly NT, so bk_id stays unique within a database;
+    # testament records which collection bk_id is numbered in (OT book 1 =
+    # Genesis, NT book 1 = Matthew).  See vmrcre/CONNECTIONS.md.
+    testament = Column (SmallInteger,  nullable = False, server_default = '2')
+
     siglum    = Column (String,        nullable = False)
     book      = Column (String,        nullable = False)
-    passage   = Column (IntRangeType,  nullable = False)
+    passage   = Column (Int8RangeType,  nullable = False)
 
     __table_args__ = (
         UniqueConstraint (siglum),
@@ -537,10 +548,10 @@ class Passages (Base2):
 
         The beginning and end of every passage is encoded in this way:
 
-          book id * 10,000,000 +
-          chapter *    100,000 +
-          verse   *      1,000 +
-          word    *          2
+          book id * 1,000,000,000 +
+          chapter *     1,000,000 +
+          verse   *         1,000 +
+          word    *             2
 
         Words are always even and the space between to words is always odd.
 
@@ -571,9 +582,9 @@ class Passages (Base2):
 
     bk_id     = Column (Integer,       nullable = False)
 
-    begadr    = Column (Integer,       nullable = False)
-    endadr    = Column (Integer,       nullable = False)
-    passage   = Column (IntRangeType,  nullable = False)
+    begadr    = Column (BigInteger,    nullable = False)
+    endadr    = Column (BigInteger,    nullable = False)
+    passage   = Column (Int8RangeType,  nullable = False)
 
     variant   = Column (Boolean,       nullable = False, server_default = 'False')
     spanning  = Column (Boolean,       nullable = False, server_default = 'False')
@@ -1058,7 +1069,7 @@ class Import_Cliques (Cliques_Mixin, Base2):
     __tablename__ = 'import_cliques'
 
     pass_id = Column (Integer)
-    passage = Column (IntRangeType, nullable = False)
+    passage = Column (Int8RangeType, nullable = False)
 
     __table_args__ = (
         PrimaryKeyConstraint ('passage', 'labez', 'clique', 'sys_period'),
@@ -1075,7 +1086,7 @@ class Import_MsCliques (MsCliques_Mixin, Base2):
 
     pass_id = Column (Integer)
     ms_id   = Column (Integer)
-    passage = Column (IntRangeType, nullable = False)
+    passage = Column (Int8RangeType, nullable = False)
     hsnr    = Column (Integer,      nullable = False)
 
     __table_args__ = (
@@ -1093,7 +1104,7 @@ class Import_LocStem (LocStem_Mixin, Base2):
     __tablename__ = 'import_locstem'
 
     pass_id = Column (Integer)
-    passage = Column (IntRangeType, nullable = False)
+    passage = Column (Int8RangeType, nullable = False)
 
     __table_args__ = (
         PrimaryKeyConstraint ('passage', 'labez', 'clique', 'source_labez', 'source_clique', 'sys_period'),
@@ -1110,7 +1121,7 @@ class Import_Notes (Notes_Mixin, Base2):
     __tablename__ = 'import_notes'
 
     pass_id = Column (Integer)
-    passage = Column (IntRangeType, nullable = False)
+    passage = Column (Int8RangeType, nullable = False)
 
     __table_args__ = (
         PrimaryKeyConstraint ('passage', 'sys_period'),
@@ -1150,7 +1161,7 @@ class Ranges (Base2):
 
     range_    = Column ('range', String,  nullable = False)
 
-    passage   = Column (IntRangeType,     nullable = False)
+    passage   = Column (Int8RangeType,     nullable = False)
 
     __table_args__ = (
         ForeignKeyConstraint ([bk_id], ['books.bk_id'], ondelete = 'CASCADE'),
@@ -1680,9 +1691,9 @@ class Nestle (Base4):
 
     id        = Column (Integer,       primary_key = True, autoincrement = True)
 
-    begadr    = Column (Integer,       nullable = False)
-    endadr    = Column (Integer,       nullable = False)
-    passage   = Column (IntRangeType,  nullable = False)
+    begadr    = Column (BigInteger,    nullable = False)
+    endadr    = Column (BigInteger,    nullable = False)
+    passage   = Column (Int8RangeType,  nullable = False)
 
     lemma     = Column (String(1024),  server_default = '')
 

@@ -9,9 +9,16 @@ from flask import current_app
 import flask_login
 
 from helpers import make_json_response
-from login import user_can_read, user_can_write
+from login import (user_can_read, user_can_write, vmrcre_service_request,
+                   vmrcre_reachable, connections, active_connection,
+                   local_dump_enabled)
+from cbgm_import import get_status
 
 bp = flask.Blueprint('info', __name__)
+
+# Sentinel "connection" for purely local, dump-loaded projects (no VMRCRE
+# backing).  Groups them under "Local" in the project list; never a real backend.
+LOCAL_CONNECTION_ID = '__local__'
 
 instances = collections.OrderedDict()
 
@@ -38,6 +45,165 @@ def user_json():
         'roles': roles,
         'can_login': current_app.config['AFTER_LOGIN_URL'] is not None
     })
+
+
+@bp.route('/connections.json')
+def connections_json():
+    """Endpoint.  The selectable VMRCRE backends and which one is active, for
+    the client's "Connect to..." menu.  See vmrcre/CONNECTIONS.md."""
+
+    active = active_connection()
+    return make_json_response({
+        'connections': connections(current_app.config),
+        'active': active.get('id') if active else None,
+        # Whether to offer the "Load a CBGM dump (work locally)" action.
+        'local_dump': local_dump_enabled(current_app.config),
+    })
+
+
+@bp.route('/projects.json')
+def projects_json():
+    """Endpoint.  The user's projects, for the home page.
+
+    Always includes every locally-mounted CBGM project, tagged with the VMRCRE
+    backend it was imported from; when connected and online, overlays the active
+    backend's live editorial project list (proxied server-side with the user's
+    session).  The client groups them by connection.  See vmrcre/CONNECTIONS.md.
+    """
+
+    user = flask_login.current_user
+    # Access is_authenticated FIRST: that resolves current_user, which runs the
+    # request loader, which records NTVMR reachability on flask.g.  Reading the
+    # flag before this would always see None (loader not yet run).
+    authed = bool(user.is_authenticated and getattr(user, 'api_key', None))
+    active = active_connection()
+    active_id = active.get('id') if active else None
+    # Did the active backend answer during this request?  None means "not probed".
+    reachable = getattr(flask.g, 'vmrcre_reachable', None)
+
+    # Every locally-mounted project, keyed by (backend, NAME).  Name -- not the
+    # numeric id -- is the cross-backend identity: the remote projectID collides
+    # across connections (NTVMR-43 == CoptOT-43), and locally-minted surrogate
+    # ids differ from the backend's, so only the name lines a mounted local
+    # project up with its live backend entry.  See the project-identity model.
+    by_key = {(r['connection_id'], r['name']): r
+              for r in _projects_from_instances()}
+
+    live_ok = False
+    if authed and active:
+        # Local projects imported from the active backend, indexed by name, so a
+        # live project overlays onto its mounted local instance (carrying that
+        # instance's local id + Open link + import status).
+        mounted_active = {row['name']: row
+                          for (cid, key), row in by_key.items()
+                          if cid == active_id}
+        # A user's projects come from the usergroups they belong to; each
+        # usergroup carries its project.
+        root = vmrcre_service_request(
+            'projectmanagement/usergroup/get',
+            {'userName': user.username},
+            user.api_key
+        )
+        if root is not None and root.tagName == 'userGroups':
+            reachable = True
+            live_ok = True
+            for ug in root.getElementsByTagName('userGroup'):
+                for p in ug.getElementsByTagName('project'):
+                    # The remote projectID is only the argument the client posts
+                    # to start.json for a NOT-yet-imported project; once imported
+                    # the mounted local row supplies the real (local) id.
+                    remote_pid = p.getAttribute('projectID')
+                    name = p.getAttribute('name')
+                    local = mounted_active.get(name) or {}
+                    by_key[(active_id, name)] = {
+                        'project_id': local.get('project_id') or remote_pid,
+                        'name': name,
+                        'object_part': p.getAttribute('objectPart'),
+                        'task_type_id': p.getAttribute('taskTypeID'),
+                        'user_group': ug.getAttribute('name'),
+                        'user_group_id': ug.getAttribute('userGroupID'),
+                        'instance_root': local.get('instance_root'),
+                        'import': local.get('import') or get_status(remote_pid),
+                        # The options the mounted instance was imported with,
+                        # so the Start dialog pre-fills them on a Reload.
+                        'import_options': local.get('import_options') or '',
+                        'connection_id': active_id,
+                        'connection_label': active.get('label'),
+                    }
+        elif root is None:
+            # The identity may have come from the session cache; the failed
+            # usergroup/get proves the active backend is unreachable right now.
+            reachable = False
+
+    # "offline" = we ARE connected to a backend but couldn't reach it now (the
+    # banner cue).  Standalone (no active connection) is not "offline".
+    if reachable is None and active and not live_ok:
+        # No session cookie to probe with (a fresh / incognito window); a cheap,
+        # breaker-aware check so the banner is right.
+        reachable = vmrcre_reachable()
+    offline = bool(active) and reachable is False
+
+    return make_json_response({
+        'username': user.username if user.is_authenticated else 'anonymous',
+        'projects': _sort_projects(list(by_key.values())),
+        'offline': offline,
+        'active_connection': active_id,
+    })
+
+
+def _sort_projects(rows):
+    """Order the project list: loaded projects (a mounted instance, i.e. an
+    'Open' link) first, then alphabetically by project name."""
+    return sorted(rows, key=lambda p: (not p.get('instance_root'),
+                                       (p.get('name') or '').lower()))
+
+
+def _projects_from_instances():
+    """Build project rows from the locally mounted instances' .conf, each tagged
+    with the VMRCRE backend it was imported from (CONNECTION_ID; see
+    vmrcre/CONNECTIONS.md).  This is the always-present base of the project list,
+    and the whole list when offline."""
+
+    reg = {c.get('id'): c for c in connections(current_app.config)}
+    rows = []
+    for inst in instances.values():
+        c = inst.config
+        # A mounted CBGM project's local identity is CBGM_LOCAL_ID (both backend-
+        # imported and purely-local projects use it now).  Legacy backend imports
+        # predate the rename and still carry the id under VMRCRE_PROJECT_ID.
+        pid = c.get('CBGM_LOCAL_ID') or c.get('VMRCRE_PROJECT_ID')
+        if not pid:
+            continue
+        # Purely local, dump-loaded projects carry no backend binding.
+        is_local = bool(c.get('CBGM_LOCAL_PROJECT'))
+        if is_local:
+            cid = LOCAL_CONNECTION_ID
+            label = 'Local'
+        else:
+            cid = c.get('CONNECTION_ID') or ''
+            # Legacy imports predate CONNECTION_ID; they were all NTVMR.
+            label = (reg.get(cid) or {}).get('label') or ('NTVMR' if not cid else cid)
+        root_path = c.get('APPLICATION_DIR', c.get('APPLICATION_ROOT', ''))
+        rows.append({
+            'project_id': str(pid),
+            # `or` not get-default: Config defines VMRCRE_PROJECT_NAME=None, so
+            # the key is present-but-None on a local project's app (no default
+            # kicks in) -- fall back to APPLICATION_NAME for the display name.
+            'name': c.get('VMRCRE_PROJECT_NAME') or c.get('APPLICATION_NAME', ''),
+            'object_part': c.get('BOOK', ''),
+            'task_type_id': c.get('VMRCRE_TASK_TYPE_ID', ''),
+            'user_group': c.get('VMRCRE_USER_GROUP', ''),
+            'user_group_id': c.get('VMRCRE_USER_GROUP_ID', ''),
+            'instance_root': root_path.rstrip('/') + '/' if root_path else None,
+            'import': get_status(pid),
+            # JSON blob of the user's Start-dialog choices (see
+            # ntvmrimport.DEFAULT_OPTIONS); '' = imported with defaults.
+            'import_options': c.get('CBGM_IMPORT_OPTIONS') or '',
+            'connection_id': cid,
+            'connection_label': label,
+            'local': bool(is_local),
+        })
+    return rows
 
 
 @bp.route('/info.json')

@@ -64,6 +64,15 @@ function load_dot (vm, dot) {
         .id (d => d.id)
         .parentId (d => d.parent_id) (data);
 
+    // Empty graph: a passage with no textual-flow arrows.  This is the normal
+    // state for a freshly imported project before any local-stemma editorial
+    // decisions exist (every reading is '?', so there is no genealogical
+    // priority and affinity.older/newer are 0 -> no flow).  Bail out cleanly
+    // instead of dereferencing root.children below.
+    if (!root.children || root.children.length === 0) {
+        return { 'width' : 0, 'height' : 0 };
+    }
+
     // sort nodes
     //
     // sort nodes in order to minimize link crossings

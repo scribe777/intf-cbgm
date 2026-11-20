@@ -1,0 +1,6 @@
+# Scenario override: CBGM_LOCAL_ONLY=true (classic shared-instance mode).
+# CBGM_ALLOW_LOCAL_DUMP unset -> defaults to !LOCAL_ONLY = false.
+services:
+  cbgm-app-server:
+    environment:
+      CBGM_LOCAL_ONLY: "true"

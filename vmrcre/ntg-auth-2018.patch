@@ -1,0 +1,305 @@
+diff --git a/client/Makefile b/client/Makefile
+index 2083263..7be87d3 100644
+--- a/client/Makefile
++++ b/client/Makefile
+@@ -2,6 +2,7 @@ WEBPACK := node_modules/.bin/webpack --no-color
+ WEBPACK_DEV_SERVER := node_modules/.bin/webpack-dev-server --no-color
+ ESLINT := node_modules/.bin/eslint -f unix
+ STYLELINT := node_modules/.bin/stylelint --custom-formatter ./stylelint-unix-formatter.js
++INSTALL_LOCATION := ~/src/community/webapp/modules/cbgm/ntg/
+ 
+ .PHONY: build build-production
+ 
+@@ -42,3 +43,8 @@ build/api.conf.js: src/api.conf.js
+ build/pdfs/GenQ4_Guide.pdf: src/pdfs/GenQ4_Guide.pdf
+ 	-mkdir -p build/pdfs
+ 	cp $< $@
++
++install:
++	mkdir -p $(INSTALL_LOCATION)
++	cp -a build/* $(INSTALL_LOCATION)
++	cp -a api.conf.js $(INSTALL_LOCATION)
+diff --git a/client/src/api.conf.js b/client/src/api.conf.js
+index b781b55..e22c494 100644
+--- a/client/src/api.conf.js
++++ b/client/src/api.conf.js
+@@ -1 +1 @@
+-var api_base_url = 'http://ntg.fritz.box/api/';
++var api_base_url = 'http://ntvmr.uni-muenster.de/community/vmr/api/cbgm/koeln/';
+diff --git a/client/src/js/main.js b/client/src/js/main.js
+index bcd73ca..9eaf991 100644
+--- a/client/src/js/main.js
++++ b/client/src/js/main.js
+@@ -84,6 +84,7 @@ Vue.prototype.build_full_api_url = function (url) {
+  */
+ 
+ Vue.prototype.get = function (url, data = {}) {
++    axios.defaults.withCredentials = true;
+     return axios.get (this.build_full_api_url (url), data);
+ };
+ 
+@@ -118,6 +119,7 @@ Vue.prototype.$trigger = function (name, data) {
+     this.$el.dispatchEvent (event);
+ };
+ 
++
+ /* eslint-disable no-new */
+ new Vue ({
+     'data' : {
+@@ -129,6 +131,7 @@ new Vue ({
+     'components' : { app },
+ });
+ 
++
+ $ (document).off ('.data-api'); // turn off bootstrap's data api
+ 
+ // The browser triggers hashchange only on window.  We want it on every app.
+diff --git a/ntg_common/tools.py b/ntg_common/tools.py
+index 4e33254..f38f074 100644
+--- a/ntg_common/tools.py
++++ b/ntg_common/tools.py
+@@ -5,8 +5,11 @@
+ import datetime
+ import logging
+ import subprocess
++import flask_login
++import requests
+ 
+ from .config import args
++from xml.dom import minidom as M
+ 
+ BOOKS = [
+     # id, siglum, name, no. of chapters
+@@ -77,9 +80,32 @@ they are not included in the text of manuscript 'A'.
+ 
+ """
+ 
+-
+ logger = logging.getLogger ()
+ 
++def ntvmr_service_request(ntvmr_service, data, include_credentials = True):
++    if include_credentials:
++        user = get_current_user()
++        if not user.is_anonymous:
++            data['sessionHash'] = user.api_key
++
++    r = requests.post("http://ntvmr.uni-muenster.de/community/vmr/api/"+ntvmr_service+"/", data=data)
++    dom = M.parseString(r.text)
++    root = dom.firstChild
++    return root
++
++
++def has_role (roleName):
++    r = ntvmr_service_request("auth/hasrole", data={'role': 'CBGM '+roleName})
++    hr = r.getAttribute("hasRole") == "true"
++    log(logging.INFO, "has_role ({roleName}) : {hr}".format(roleName=roleName, hr=hr))
++    return hr
++    
++
++def get_current_user():
++
++    user = flask_login.current_user
++    return user
++
+ def quote (s):
+     if ' ' in s:
+         return '"' + s + '"'
+diff --git a/server/editor.py b/server/editor.py
+index f8a4211..3f3aab4 100644
+--- a/server/editor.py
++++ b/server/editor.py
+@@ -7,7 +7,6 @@ import re
+ 
+ import flask
+ from flask import request, current_app
+-import flask_login
+ import networkx as nx
+ import sqlalchemy
+ 
+@@ -65,11 +64,15 @@ def stemma_edit (passage_or_id):
+ 
+     """
+ 
+-    if not flask_login.current_user.has_role ('editor'):
+-        raise PrivilegeError ('You don\'t have editor privilege.')
+-
+     args = request.get_json ()
+ 
++    # assert we have args
++    if args == None:
++        return make_json_response (message = 'stemma-edit')
++
++    if not tools.has_role ('editor'):
++        raise PrivilegeError ('You don\'t have editor privilege.')
++
+     action = args.get ('action')
+ 
+     if action not in ('split', 'merge', 'move', 'move-manuscripts'):
+@@ -92,7 +95,7 @@ def stemma_edit (passage_or_id):
+     with current_app.config.dba.engine.begin () as conn:
+         passage = Passage (conn, passage_or_id)
+         params['pass_id'] = passage.pass_id
+-        params['user_id'] = flask_login.current_user.id
++        params['user_id'] = tools.get_current_user().id
+ 
+         res = execute (conn, """
+         SET LOCAL ntg.user_id = :user_id;
+@@ -207,7 +210,7 @@ def notes (passage_or_id):
+ 
+     """
+ 
+-    if not flask_login.current_user.has_role ('editor'):
++    if not tools.has_role ('editor'):
+         raise PrivilegeError ('You don\'t have editor privilege.')
+ 
+     with current_app.config.dba.engine.begin () as conn:
+@@ -216,7 +219,7 @@ def notes (passage_or_id):
+         if request.method == 'PUT':
+             res = execute (conn, """
+             SET LOCAL ntg.user_id = :user_id;
+-            """, dict (parameters, user_id = flask_login.current_user.id))
++            """, dict (parameters, user_id = tools.get_current_user().id))
+ 
+             res = execute (conn, """
+             INSERT INTO notes AS n (pass_id, note)
+diff --git a/server/security.py b/server/security.py
+index 49dd855..cfe27a2 100644
+--- a/server/security.py
++++ b/server/security.py
+@@ -7,7 +7,6 @@ import flask_login
+ 
+ from ntg_common import db as dbx
+ 
+-
+ def declare_user_model (db): # db = flask_sqlalchemy.SQLAlchemy ()
+     global User, Role, Roles_Users
+ 
+diff --git a/server/server.py b/server/server.py
+index ee2315a..8351def 100755
+--- a/server/server.py
++++ b/server/server.py
+@@ -10,6 +10,7 @@ import re
+ import os
+ import os.path
+ import urllib.parse
++import requests
+ 
+ import flask
+ from flask import request, current_app
+@@ -24,11 +25,14 @@ from ntg_common.config import init_cmdline
+ from ntg_common.tools import log
+ from ntg_common import tools
+ from ntg_common import db_tools
++from xml.dom import minidom as M
+ 
+ from . import helpers
+ from .helpers import parameters, Passage, Manuscript, make_json_response
+ from . import security
+ from . import editor
++from flask_login import LoginManager, UserMixin, \
++                                login_required, login_user, logout_user
+ 
+ app = flask.Blueprint ('the_app', __name__)
+ static_app = flask.Flask (__name__)
+@@ -37,6 +41,7 @@ security.declare_user_model (dba)
+ db_adapter = flask_user.SQLAlchemyAdapter (dba, security.User)
+ login_manager = flask_login.LoginManager ()
+ login_manager.anonymous_user = security.AnonymousUserMixin
++login_manager.init_app(static_app)
+ user_manager = flask_user.UserManager (db_adapter)
+ mail = flask_mail.Mail ()
+ 
+@@ -127,12 +132,12 @@ def messages_json ():
+ def user_json ():
+     """Endpoint.  Serve information about the current user."""
+ 
+-    user = flask_login.current_user
++    user = tools.get_current_user()
+     logged_in = user.is_authenticated
+ 
+     return make_json_response ({
+         'is_logged_in' : logged_in,
+-        'is_editor' :    logged_in and user.has_role ('editor'),
++        'is_editor' :    tools.has_role ('editor'),
+         'username' :     user.username if logged_in else 'anonymous',
+     })
+ 
+@@ -1029,7 +1034,7 @@ def stemma (passage_or_id):
+     with current_app.config.dba.engine.begin () as conn:
+         passage = Passage (conn, passage_or_id)
+         graph = db_tools.local_stemma_to_nx (
+-            conn, passage.pass_id, flask_login.current_user.has_role ('editor')
++            conn, passage.pass_id, tools.has_role ('editor')
+         )
+         dot = helpers.nx_to_dot (graph, width, fontsize, nodesep = 0.2)
+         return dot
+@@ -1083,6 +1088,54 @@ def build_parser ():
+     )
+     return parser
+ 
++class MyUser(UserMixin):
++
++    def __init__(self, api_key, id, name):
++        log(logging.INFO, "c-tor")
++        self.api_key = api_key
++        self.id = id
++        self.name = name
++        self.username = name
++
++    @property
++    def is_active(self):
++        return True
++
++    @property
++    def is_authenticated(self):
++        return True
++
++    @property
++    def is_anonymous(self):
++        return False
++
++    def __repr__(self):
++        return "%d/%s/%s" % (self.id, self.name, self.password)
++
++
++@login_manager.user_loader
++def load_user(user_id):
++    return db.session.query(UserAccount).get(int(user_id))
++
++
++@login_manager.request_loader
++def load_user_from_request(request):
++
++    log (logging.INFO, "request_loader called")
++    if 'ntvmrSession' in request.cookies:
++        api_key = request.cookies.get('ntvmrSession')
++        log (logging.INFO, "ntvmrSession is present in the cookies: {api_key}".format(api_key = api_key))
++        r = tools.ntvmr_service_request("/auth/session/check/", {'sessionHash': api_key}, False)
++        if r.tagName == "user":
++            my_id = r.getAttribute("internalUserID");
++            my_user_name = r.getAttribute("userName");
++            log (logging.INFO, "User, userID: {my_id}; userName: {my_user_name}".format(my_id=my_id, my_user_name=my_user_name))
++        
++            user = MyUser(api_key, my_id, my_user_name)
++            return user
++
++    return None
++
+ 
+ if __name__ == "__main__":
+     from werkzeug.routing import Map, Rule
+@@ -1141,7 +1194,7 @@ if __name__ == "__main__":
+             Rule ('/textflow.dot/<passage_or_id>',                endpoint = 'textflow.dot'),
+             Rule ('/textflow.png/<passage_or_id>',                endpoint = 'textflow.png'),
+             Rule ('/notes.txt/<passage_or_id>',                   endpoint = 'notes.txt', methods = ['GET', 'PUT']),
+-            Rule ('/stemma-edit/<passage_or_id>',                 endpoint = 'stemma-edit', methods = ['POST']),
++            Rule ('/stemma-edit/<passage_or_id>',                 endpoint = 'stemma-edit', methods = ['POST', 'OPTIONS']),
+         ])
+ 
+         log (logging.INFO, "Mounted {name} at {path} from conf {conf}".format (
+@@ -1160,3 +1213,5 @@ if __name__ == "__main__":
+ 
+     dispatcher = DispatcherMiddleware (static_app, instances)
+     run_simple ('localhost', 5000, dispatcher)
++
++

@@ -1,4 +1,3 @@
-version: "3"
 services:
   ntg-db-server:
     image: scdh/intf-cbgm-db-server
