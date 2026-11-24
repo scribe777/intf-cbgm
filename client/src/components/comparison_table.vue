@@ -37,7 +37,7 @@
           <th class="norel" data-sort-by="norel"
               title="Number of passages where the respective variants are unrelated">NoRel</th>
           <th class="stab" data-sort-by="flips"
-              title="Stability of the direction: at how many passages the priority of the variants would have to be decided the other way for the direction to vanish.  Grey: a majority this narrow could be chance.">Stab</th>
+              title="Local stemmata that, decided the other way, erase the direction. Grey: may be chance.">Stab</th>
         </tr>
       </thead>
       <tbody>
@@ -137,7 +137,7 @@ function row_conversion (d) {
         'flips'      : st.flips,
         'stable'     : st.stable,
         'stab_title' : tools.direction_stability_title (
-            Math.max (+d.older, +d.newer), Math.min (+d.older, +d.newer)
+            Math.max (+d.older, +d.newer), Math.min (+d.older, +d.newer),
         ),
         'rg_id'     : +d.rg_id,
         'range'     : d.range,

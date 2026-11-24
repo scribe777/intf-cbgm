@@ -353,7 +353,7 @@ div.vm-coherence {
 
             /* a direction resting on a narrow majority, see: tools.direction_stability () */
             &.unstable {
-                stroke-opacity: 0.3;
+                stroke-opacity: 0.45;
                 stroke-width: 1px;
             }
 
